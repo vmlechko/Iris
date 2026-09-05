@@ -20,7 +20,7 @@ Early. Currently validating the account architecture before building the product
 
 - [x] Project scaffold
 - [x] Spike: EIP-7702 sponsored gas for a zero-balance account — **passed**
-- [ ] Mera passkey onboarding in the browser
+- [~] Mera passkey onboarding in the browser — PRF support mapped, wiring in progress
 - [ ] Commitment escrow contract
 - [ ] Recipient flow
 - [ ] Sender flow
@@ -104,3 +104,29 @@ ERC-3009 means neither side needs to hold gas for the money to move: the sender 
 `transferWithAuthorization` off-chain and a relayer submits it. Combined with the fact
 that scheduled payouts are *pushed* by a keeper, the recipient never signs anything to
 receive funds — only to spend them.
+
+## Authenticator support, measured
+
+The account layer rests on the WebAuthn PRF extension, and PRF is not uniformly
+available. Measured on macOS 26 with `spikes/mera-browser`, which calls
+`navigator.credentials` directly and prints what the platform returns:
+
+| Browser | Store | `extension:prf` | Result at registration |
+|---|---|---|---|
+| Safari | iCloud Keychain | true | `{enabled: true, results: {first: …}}` |
+| Chrome | iCloud Keychain | true | `{enabled: true, results: {first: …}}` |
+| Chrome | Chrome profile | true | **`{enabled: false}`** |
+
+The client capability says nothing about the outcome: Chrome reports
+`extension:prf = true` and then hands back a credential with PRF disabled when
+the passkey lands in its own profile store. A six-digit PIN prompt during
+registration is the tell.
+
+Two consequences for the product:
+
+- Pinning `authenticatorAttachment: "platform"` steers macOS Chrome into the
+  profile store. Leaving the selection unconstrained lets the picker appear so
+  iCloud Keychain can be chosen.
+- A passkey created without PRF cannot rebuild the account, so the failure has
+  to be caught at registration and explained, not discovered later when the
+  user returns to an account that no longer resolves.
