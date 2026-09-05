@@ -16,11 +16,11 @@ Built for **Monad Metropolis 2026** — Track 02, Consumer Products & Payments.
 
 ## Status
 
-Early. Currently validating the account architecture before building the product.
+The account layer is proven end to end. Building the product on top of it now.
 
 - [x] Project scaffold
 - [x] Spike: EIP-7702 sponsored gas for a zero-balance account — **passed**
-- [~] Mera passkey onboarding in the browser — PRF support mapped, wiring in progress
+- [x] Mera passkey onboarding in the browser — **stateless test passes**
 - [ ] Commitment escrow contract
 - [ ] Recipient flow
 - [ ] Sender flow
@@ -104,6 +104,28 @@ ERC-3009 means neither side needs to hold gas for the money to move: the sender 
 `transferWithAuthorization` off-chain and a relayer submits it. Combined with the fact
 that scheduled payouts are *pushed* by a keeper, the recipient never signs anything to
 receive funds — only to spend them.
+
+## The stateless test, passed
+
+Safari, iCloud Keychain, nothing persisted:
+
+```
+create   credential 4GvQoXpkKxEyKeU0TSX3gZP7fho
+         prf output 32 bytes
+         address    0xdc0CAcA6C26b31B0eB8584464e149Bda32892856
+wipe     localStorage and sessionStorage cleared
+sign in  address    0xdc0CAcA6C26b31B0eB8584464e149Bda32892856   ← identical
+```
+
+`getPasskeyPrfOutput` takes an `rpId` and an *optional* credential id. Omitting
+the id lets the platform offer the passkey, and a fixed 32-byte PRF salt yields
+the same entropy, the same secp256k1 key, and the same address. Nothing is
+written to storage at any point, so there is nothing for a judge to clear.
+
+Together with the 7702 result above, the whole account layer now rests on
+measurements rather than assumptions: a passkey produces a stable key, the key
+is a plain EOA, 7702 gives that EOA smart-contract behaviour, and a sponsor
+pays for it.
 
 ## Authenticator support, measured
 
