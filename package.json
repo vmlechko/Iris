@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "compile": "node scripts/compile.mjs",
-    "spike:7702": "tsx scripts/spike-7702.ts"
+    "spike:7702": "tsx scripts/spike-7702.ts",
+    "probe:ausd": "node scripts/probe-ausd.mjs"
   },
   "keywords": [],
   "author": "",

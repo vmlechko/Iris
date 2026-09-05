@@ -54,3 +54,22 @@ rules, section 4.1.
 ## License
 
 MIT
+
+## Verified on-chain (5 Sep 2026)
+
+AUSD on Monad testnet — `0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC`
+
+| | |
+|---|---|
+| symbol | `AUSD` |
+| **decimals** | **6** — not 18 |
+| EIP-712 | `DOMAIN_SEPARATOR()` present |
+| ERC-2612 | `nonces()` present |
+| **ERC-3009** | **`authorizationState()` present** — gasless transfers by signature |
+
+`npm run probe:ausd` re-runs the check.
+
+ERC-3009 means neither side needs to hold gas for the money to move: the sender signs
+`transferWithAuthorization` off-chain and a relayer submits it. Combined with the fact
+that scheduled payouts are *pushed* by a keeper, the recipient never signs anything to
+receive funds — only to spend them.
