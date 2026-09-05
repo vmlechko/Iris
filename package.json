@@ -1,0 +1,25 @@
+{
+  "name": "monada",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "compile": "node scripts/compile.mjs",
+    "spike:7702": "tsx scripts/spike-7702.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Cross-border commitments that the recipient can see coming. Monad Metropolis 2026.",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "viem": "^2.56.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "solc": "^0.8.36",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  },
+  "type": "module",
+  "private": true
+}

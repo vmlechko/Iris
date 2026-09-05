@@ -1,0 +1,7 @@
+node_modules/
+artifacts/
+.env
+.env.local
+.DS_Store
+dist/
+.next/
