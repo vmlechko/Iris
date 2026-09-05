@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Iris · Mera stateless spike</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Mera stateless spike</h1>
+      <p class="lede">
+        Does the same passkey rebuild the same account with nothing stored?
+        That is the bar the Mera bounty judges on.
+      </p>
+
+      <section class="actions">
+        <button id="create">Create passkey</button>
+        <button id="signin">Sign in with passkey</button>
+        <button id="wipe" class="ghost">Wipe all local state</button>
+      </section>
+
+      <section id="account" hidden>
+        <div class="row"><span>address</span><code id="address"></code></div>
+        <div class="row"><span>credential</span><code id="credential"></code></div>
+        <div class="row"><span>local storage</span><code id="storage"></code></div>
+      </section>
+
+      <section id="verdict" hidden></section>
+
+      <pre id="log" aria-live="polite"></pre>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

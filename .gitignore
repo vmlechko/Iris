@@ -5,3 +5,5 @@ artifacts/
 .DS_Store
 dist/
 .next/
+spikes/*/node_modules/
+spikes/*/dist/

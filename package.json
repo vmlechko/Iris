@@ -12,6 +12,7 @@
   "license": "ISC",
   "description": "Cross-border support the recipient can see coming. Passkey accounts, AUSD, commitments on Monad.",
   "dependencies": {
+    "@category-labs/mera": "^0.2.0",
     "dotenv": "^17.4.2",
     "viem": "^2.56.3"
   },
