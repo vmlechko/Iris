@@ -1,0 +1,11 @@
+import { createPublicClient, http, formatEther } from "viem";
+import { monadTestnet } from "viem/chains";
+import { privateKeyToAccount } from "viem/accounts";
+import { readFileSync } from "node:fs";
+const env = readFileSync(".env", "utf8");
+const pk = env.match(/SPONSOR_PK=(0x[0-9a-fA-F]{64})/)?.[1];
+const acc = privateKeyToAccount(pk);
+const c = createPublicClient({ chain: monadTestnet, transport: http() });
+const b = await c.getBalance({ address: acc.address });
+console.log("адрес спонсора:", acc.address);
+console.log("баланс:        ", formatEther(b), "MON");

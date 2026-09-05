@@ -19,7 +19,7 @@ Built for **Monad Metropolis 2026** — Track 02, Consumer Products & Payments.
 Early. Currently validating the account architecture before building the product.
 
 - [x] Project scaffold
-- [ ] **Spike: EIP-7702 sponsored gas for a zero-balance account** ← blocking
+- [x] Spike: EIP-7702 sponsored gas for a zero-balance account — **passed**
 - [ ] Mera passkey onboarding in the browser
 - [ ] Commitment escrow contract
 - [ ] Recipient flow
@@ -34,11 +34,38 @@ Early. Currently validating the account architecture before building the product
 - **Next.js + Serwist** (PWA) — mobile experience, opened from a link.
 - **viem**, **Solidity**
 
-## The open question
+## The account architecture, verified
 
-Monad prevents a *delegated* EOA from dropping below a 10 MON reserve. Our recipient
-holds exactly 0 MON. `scripts/spike-7702.ts` answers whether that restriction blocks a
-sponsored call from an empty account. Everything else waits on the answer.
+Monad prevents a *delegated* EOA from dropping below a 10 MON reserve, and the Iris
+recipient holds exactly 0 MON. `scripts/spike-7702.ts` settles whether that blocks a
+sponsored call from an empty account. It does not.
+
+A freshly generated account with a zero balance signed an EIP-7702 authorization
+offline, a funded sponsor submitted the type-4 transaction, and the call landed:
+
+```
+tx        0xe7f5907223cf66c0997b3f6187ff556bda92cd585abe0c435672c397e5af59ca
+status    success
+gas used  88,452
+probe saw the recipient as msg.sender
+recipient balance after   0 MON
+recipient code            0xef0100 8d7d…   (7702 delegation designator)
+```
+
+So the account layer is: **Mera derives a plain EOA from a passkey, EIP-7702 gives that
+EOA smart-contract behaviour, and a sponsor pays the gas.** No smart-account contract to
+deploy, no bundler, and Mera remains the entire account layer.
+
+### One design rule this exposed
+
+The reserve is a floor on *reductions*, and a balance of zero cannot be reduced. That
+holds only while the recipient's native balance stays at zero — AUSD is an ERC-20, so
+moving it never touches MON. But if the recipient ever came to hold a small amount of
+MON, a delegated account dropping from, say, 0.5 MON toward zero is exactly the case the
+rule is written about.
+
+**Never send the recipient native MON.** Their balance stays at zero and gas stays with
+the sponsor. Anything else re-opens a question we just closed.
 
 ## Running the spike
 
