@@ -1,6 +1,10 @@
-# Monada
+# Iris
 
 Cross-border support that the recipient can see coming.
+
+*Iris carried messages between worlds along a rainbow bridge — and an iris is also
+the part of the eye. Both halves of the name are the product: a bridge across a
+border, entered with a glance.*
 
 Instead of a one-off transfer, the sender creates a **commitment** — "$200 on the 5th,
 every month". The money is reserved up front and the recipient sees the confirmed

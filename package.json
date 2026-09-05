@@ -1,5 +1,5 @@
 {
-  "name": "monada",
+  "name": "iris",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -10,7 +10,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "Cross-border commitments that the recipient can see coming. Monad Metropolis 2026.",
+  "description": "Cross-border support the recipient can see coming. Passkey accounts, AUSD, commitments on Monad.",
   "dependencies": {
     "dotenv": "^17.4.2",
     "viem": "^2.56.3"

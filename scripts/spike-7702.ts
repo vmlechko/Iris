@@ -1,7 +1,7 @@
 /**
  * Spike: can a ZERO-BALANCE EOA execute a sponsored call on Monad testnet?
  *
- * This is the blocking question for Monada's recipient flow. Monad restricts
+ * This is the blocking question for the Iris recipient flow. Monad restricts
  * delegated EOAs from dropping below a 10 MON reserve; our recipient will hold
  * exactly 0 MON and never touch gas. If this passes, EIP-7702 + a sponsor is
  * our account architecture. If it fails, we fall back to a meta-transaction
@@ -30,7 +30,7 @@ function line(label: string, value: unknown) {
 }
 
 async function main() {
-  console.log("\n── Monada · EIP-7702 sponsored-gas spike ──\n");
+  console.log("\n── Iris · EIP-7702 sponsored-gas spike ──\n");
   line("chain", `${monadTestnet.name} (${monadTestnet.id})`);
   line("rpc", rpc);
 
