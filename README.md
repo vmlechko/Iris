@@ -189,6 +189,43 @@ A missed scheduler window costs the recipient nothing: `release` catches up on
 every payment whose time has passed, which the run above shows as 400 AUSD
 becoming claimable in one call.
 
+### How the two people find each other
+
+A sender cannot address a commitment to someone who has no wallet, which is
+everyone this is for. Asking them to send an address first is the moment the
+product stops being about money and starts being about crypto.
+
+So a commitment can be opened against a **keypair** instead. The public half
+stays on chain; the private half travels in a link, over whatever messenger the
+two people already use. Whoever opens the link signs their own fresh address
+with the link key, and the commitment binds to them — with everything already
+due arriving in that same moment, which is the only moment they are watching.
+
+The address sits *inside* the signature rather than beside it. An observer
+watching the mempool can only replay the claim to the address it already names,
+so the link is safe to send the way people actually send things. `scripts/claim-link.ts`
+tries exactly that theft and fails:
+
+```
+✓ commitment has no recipient yet
+✓ nothing is releasable while unclaimed
+✓ the whole schedule is escrowed
+✓ recipient holds 0 MON
+✓ the link bound to the address that opened it
+✓ money due arrived the moment the link opened
+✓ recipient still holds 0 MON and signed no transaction
+✓ commitment is now discoverable from the recipient's address
+✓ a captured signature cannot be pointed at a different address
+```
+
+Contact-list matching — the way a messenger shows who is already on it — needs
+a phone directory on a server, SMS verification, and native access to an address
+book. Safari on iOS has no contacts API at all, and a server holding phone
+numbers is exactly the server-as-source-of-truth the stateless test rules out.
+The link avoids all three: the address book that matters is the one already in
+the messenger. After a first claim the address is known, so the people you have
+actually paid become a list built from history rather than from a phone.
+
 ### AUSD
 
 Iris settles in Agora's real AUSD, and the lifecycle above runs against it, not

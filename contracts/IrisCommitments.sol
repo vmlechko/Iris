@@ -47,7 +47,10 @@ interface IAUSD {
 contract IrisCommitments {
     struct Commitment {
         address sender;
+        /// @dev Zero until a claim link is redeemed.
         address recipient;
+        /// @dev Public key of the claim link. Zero for a direct commitment.
+        address claimSigner;
         uint128 amountPerPayment;
         uint40 interval;
         uint40 nextPaymentAt;
@@ -80,6 +83,7 @@ contract IrisCommitments {
         uint40 nextPaymentAt
     );
     event CommitmentCancelled(uint256 indexed id, address indexed sender, uint256 refunded);
+    event CommitmentClaimed(uint256 indexed id, address indexed recipient);
 
     error NotSender();
     error AlreadyCancelled();
@@ -87,9 +91,32 @@ contract IrisCommitments {
     error Completed();
     error InvalidSchedule();
     error TransferFailed();
+    error NotClaimed();
+    error AlreadyClaimed();
+    error BadClaimSignature();
+
+    bytes32 private constant CLAIM_TYPEHASH =
+        keccak256("Claim(uint256 id,address recipient)");
+
+    bytes32 private immutable _domainSeparator;
 
     constructor(IAUSD token_) {
         token = token_;
+        _domainSeparator = keccak256(
+            abi.encode(
+                keccak256(
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                ),
+                keccak256("Iris"),
+                keccak256("1"),
+                block.chainid,
+                address(this)
+            )
+        );
+    }
+
+    function domainSeparator() external view returns (bytes32) {
+        return _domainSeparator;
     }
 
     // ---------------------------------------------------------------- create
@@ -141,14 +168,99 @@ contract IrisCommitments {
         id = _open(from, recipient, amountPerPayment, interval, paymentsTotal, startNow);
     }
 
+    /**
+     * @notice Open a commitment for someone who has no address yet.
+     *
+     * The sender generates a keypair, keeps the public half here and puts the
+     * private half in a link. Whoever opens the link signs their own fresh
+     * address with it and the commitment binds to them.
+     *
+     * The address being signed rather than merely presented is what makes the
+     * link safe to send over a messenger: an observer who sees the claim in the
+     * mempool can only replay it to the same address it already names.
+     */
+    function createToClaim(
+        address claimSigner,
+        uint128 amountPerPayment,
+        uint40 interval,
+        uint16 paymentsTotal,
+        bool startNow
+    ) external returns (uint256 id) {
+        if (claimSigner == address(0)) revert InvalidSchedule();
+        uint256 total = _validateSchedule(amountPerPayment, interval, paymentsTotal);
+        if (!token.transferFrom(msg.sender, address(this), total)) revert TransferFailed();
+
+        id = _commitments.length;
+        _commitments.push(
+            Commitment({
+                sender: msg.sender,
+                recipient: address(0),
+                claimSigner: claimSigner,
+                amountPerPayment: amountPerPayment,
+                interval: interval,
+                nextPaymentAt: startNow ? uint40(block.timestamp) : uint40(block.timestamp) + interval,
+                paymentsTotal: paymentsTotal,
+                paymentsMade: 0,
+                cancelled: false
+            })
+        );
+        _outgoing[msg.sender].push(id);
+
+        emit CommitmentCreated(
+            id,
+            msg.sender,
+            address(0),
+            amountPerPayment,
+            interval,
+            paymentsTotal,
+            _commitments[id].nextPaymentAt
+        );
+    }
+
+    /**
+     * @notice Bind a claim link to an address and pay out whatever is due.
+     * @param signature EIP-712 `Claim(uint256 id,address recipient)` signed by
+     *        the link's key. Anyone may submit it — a relayer usually does,
+     *        since a recipient arriving through a passkey holds no gas.
+     */
+    function claim(uint256 id, address recipient, bytes calldata signature) external {
+        Commitment storage c = _commitments[id];
+        if (c.cancelled) revert AlreadyCancelled();
+        if (c.recipient != address(0)) revert AlreadyClaimed();
+        if (recipient == address(0) || recipient == c.sender) revert InvalidSchedule();
+
+        bytes32 digest = keccak256(
+            abi.encodePacked(
+                "\x19\x01",
+                _domainSeparator,
+                keccak256(abi.encode(CLAIM_TYPEHASH, id, recipient))
+            )
+        );
+        if (_recover(digest, signature) != c.claimSigner) revert BadClaimSignature();
+
+        c.recipient = recipient;
+        _incoming[recipient].push(id);
+        emit CommitmentClaimed(id, recipient);
+
+        // Money that accrued while the link sat unopened arrives at the moment
+        // it is opened, which is the only moment the recipient is watching.
+        if (block.timestamp >= c.nextPaymentAt) _releaseDue(id);
+    }
+
     // --------------------------------------------------------------- release
 
     /// @notice Push every payment that has come due. Callable by anyone.
     function release(uint256 id) external {
         Commitment storage c = _commitments[id];
         if (c.cancelled) revert AlreadyCancelled();
+        if (c.recipient == address(0)) revert NotClaimed();
         if (c.paymentsMade >= c.paymentsTotal) revert Completed();
         if (block.timestamp < c.nextPaymentAt) revert NothingDue();
+        _releaseDue(id);
+    }
+
+    function _releaseDue(uint256 id) private {
+        Commitment storage c = _commitments[id];
 
         uint16 due;
         // A scheduler that misses a window must not cost the recipient money,
@@ -188,7 +300,12 @@ contract IrisCommitments {
         if (msg.sender != c.sender) revert NotSender();
         if (c.cancelled) revert AlreadyCancelled();
 
-        uint16 owed = block.timestamp >= c.nextPaymentAt && c.paymentsMade < c.paymentsTotal ? 1 : 0;
+        // Nobody is owed anything on a link that was never opened.
+        uint16 owed = c.recipient != address(0) &&
+            block.timestamp >= c.nextPaymentAt &&
+            c.paymentsMade < c.paymentsTotal
+            ? 1
+            : 0;
         uint256 remaining = uint256(c.paymentsTotal - c.paymentsMade - owed) * c.amountPerPayment;
 
         c.cancelled = true;
@@ -230,7 +347,8 @@ contract IrisCommitments {
     ///         spend gas on `release`.
     function releasable(uint256 id) external view returns (uint128) {
         Commitment memory c = _commitments[id];
-        if (c.cancelled || c.paymentsMade >= c.paymentsTotal) return 0;
+        if (c.cancelled || c.recipient == address(0)) return 0;
+        if (c.paymentsMade >= c.paymentsTotal) return 0;
         if (block.timestamp < c.nextPaymentAt) return 0;
         uint256 elapsed = block.timestamp - c.nextPaymentAt;
         uint256 due = 1 + elapsed / c.interval;
@@ -247,6 +365,33 @@ contract IrisCommitments {
         uint16 paymentsTotal
     ) private view returns (uint256 total) {
         return _validateFor(msg.sender, recipient, amountPerPayment, interval, paymentsTotal);
+    }
+
+    function _validateSchedule(
+        uint128 amountPerPayment,
+        uint40 interval,
+        uint16 paymentsTotal
+    ) private pure returns (uint256 total) {
+        if (amountPerPayment == 0 || interval == 0 || paymentsTotal == 0) revert InvalidSchedule();
+        total = uint256(amountPerPayment) * paymentsTotal;
+    }
+
+    /// @dev Rejects the upper half of the signature space, so a valid signature
+    ///      cannot be flipped into a second one for the same claim.
+    function _recover(bytes32 digest, bytes calldata signature) private pure returns (address) {
+        if (signature.length != 65) revert BadClaimSignature();
+        bytes32 r;
+        bytes32 sig_s;
+        assembly {
+            r := calldataload(signature.offset)
+            sig_s := calldataload(add(signature.offset, 32))
+        }
+        uint8 v = uint8(signature[64]);
+        if (uint256(sig_s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0)
+            revert BadClaimSignature();
+        address signer = ecrecover(digest, v, r, sig_s);
+        if (signer == address(0)) revert BadClaimSignature();
+        return signer;
     }
 
     function _validateFor(
@@ -282,6 +427,7 @@ contract IrisCommitments {
             Commitment({
                 sender: sender,
                 recipient: recipient,
+                claimSigner: address(0),
                 amountPerPayment: amountPerPayment,
                 interval: interval,
                 nextPaymentAt: firstAt,

@@ -11,7 +11,8 @@
     "spike:7702": "tsx scripts/spike-7702.ts",
     "probe:ausd": "node scripts/probe-ausd.mjs",
     "lifecycle": "tsx scripts/lifecycle.ts",
-    "get:ausd": "node scripts/get-ausd.mjs"
+    "get:ausd": "node scripts/get-ausd.mjs",
+    "claim-link": "tsx scripts/claim-link.ts"
   },
   "keywords": [],
   "author": "",
