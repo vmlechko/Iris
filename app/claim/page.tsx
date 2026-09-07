@@ -149,8 +149,8 @@ export default function Claim() {
       </h1>
       <p className="lede">
         Then {money(c.amountPerPayment)} {cadenceLabel(c.interval)}, {left - 1} more{" "}
-        {left - 1 === 1 ? "time" : "times"} — {money(remaining(c))} in all, already
-        set aside and waiting.
+        {left - 1 === 1 ? "time" : "times"}. All {money(remaining(c))} of it is
+        already set aside and waiting.
       </p>
 
       <div className="actions">
