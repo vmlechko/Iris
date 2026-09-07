@@ -11,6 +11,10 @@ const input = {
   sources,
   settings: {
     optimizer: { enabled: true, runs: 200 },
+    // createToClaimWithAuthorization carries more arguments than the stack
+    // holds; the IR pipeline is the supported answer rather than shuffling
+    // parameters into structs to please the old codegen.
+    viaIR: true,
     outputSelection: { "*": { "*": ["abi", "evm.bytecode.object"] } },
   },
 };

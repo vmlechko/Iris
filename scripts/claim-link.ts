@@ -63,14 +63,28 @@ async function main() {
   if ((await read(AUSD, erc20, "balanceOf", [sender.address])) < total) {
     await send(FAUCET, [{ type: "function", name: "requestFunds", inputs: [{ type: "address" }], outputs: [], stateMutability: "nonpayable" }], "requestFunds", [sender.address]);
   }
-  await send(AUSD, erc20, "approve", [iris, total]);
 
   // ---- the sender opens a commitment against a link, not an address --------
   const linkKey = generatePrivateKey();
   const link = privateKeyToAccount(linkKey);
   line("link key (goes in the URL)", `${linkKey.slice(0, 14)}…`);
 
-  await send(iris, I, "createToClaim", [link.address, perPayment, 30, 3, true]);
+  // The app creates gaslessly: the sender signs, a relayer submits.
+  const salt = generatePrivateKey();
+  const nonce = await read(iris, I, "authorizationNonce", [salt, link.address, perPayment, 30, 3, true]);
+  const validBefore = BigInt(Math.floor(Date.now() / 1000) + 3600);
+  const authorization = await sender.signTypedData({
+    domain: { name: "Agora Dollar", version: "1", chainId: monadTestnet.id, verifyingContract: AUSD },
+    types: { ReceiveWithAuthorization: [
+      { name: "from", type: "address" }, { name: "to", type: "address" },
+      { name: "value", type: "uint256" }, { name: "validAfter", type: "uint256" },
+      { name: "validBefore", type: "uint256" }, { name: "nonce", type: "bytes32" }]},
+    primaryType: "ReceiveWithAuthorization",
+    message: { from: sender.address, to: iris, value: total, validAfter: 0n, validBefore, nonce },
+  });
+  await send(iris, I, "createToClaimWithAuthorization", [
+    sender.address, link.address, perPayment, 30, 3, true, 0n, validBefore, salt, authorization,
+  ]);
   const id = (await read(iris, I, "count")) - 1n;
   let c = await read(iris, I, "get", [id]);
   check(c.recipient === "0x0000000000000000000000000000000000000000", "commitment has no recipient yet");

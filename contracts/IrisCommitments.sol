@@ -242,32 +242,84 @@ contract IrisCommitments {
         if (claimSigner == address(0)) revert InvalidSchedule();
         uint256 total = _validateSchedule(amountPerPayment, interval, paymentsTotal);
         if (!token.transferFrom(msg.sender, address(this), total)) revert TransferFailed();
+        id = _openToClaim(msg.sender, claimSigner, amountPerPayment, interval, paymentsTotal, startNow);
+    }
 
+    function _openToClaim(
+        address sender,
+        address claimSigner,
+        uint128 amountPerPayment,
+        uint40 interval,
+        uint16 paymentsTotal,
+        bool startNow
+    ) private returns (uint256 id) {
         id = _commitments.length;
+        uint40 firstAt = startNow ? uint40(block.timestamp) : uint40(block.timestamp) + interval;
+
         _commitments.push(
             Commitment({
-                sender: msg.sender,
+                sender: sender,
                 recipient: address(0),
                 claimSigner: claimSigner,
                 amountPerPayment: amountPerPayment,
                 interval: interval,
-                nextPaymentAt: startNow ? uint40(block.timestamp) : uint40(block.timestamp) + interval,
+                nextPaymentAt: firstAt,
                 paymentsTotal: paymentsTotal,
                 paymentsMade: 0,
                 cancelled: false
             })
         );
-        _outgoing[msg.sender].push(id);
+        _outgoing[sender].push(id);
 
         emit CommitmentCreated(
             id,
-            msg.sender,
+            sender,
             address(0),
             amountPerPayment,
             interval,
             paymentsTotal,
-            _commitments[id].nextPaymentAt
+            firstAt
         );
+    }
+
+    /**
+     * @notice Open a claim link without holding gas or granting an approval.
+     *
+     * Both halves of Iris are meant to work from an empty account: the person
+     * receiving arrives through a passkey with nothing, and there is no reason
+     * the person sending should have to be different. A relayer submits this.
+     *
+     * @param salt Chosen by the sender so two identical schedules do not
+     *        collide on the same ERC-3009 nonce.
+     */
+    function createToClaimWithAuthorization(
+        address from,
+        address claimSigner,
+        uint128 amountPerPayment,
+        uint40 interval,
+        uint16 paymentsTotal,
+        bool startNow,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 salt,
+        bytes calldata signature
+    ) external returns (uint256 id) {
+        if (claimSigner == address(0) || from == address(0)) revert InvalidSchedule();
+        uint256 total = _validateSchedule(amountPerPayment, interval, paymentsTotal);
+
+        // The claim key is bound in alongside the schedule, so an authorization
+        // lifted out of the mempool cannot be re-pointed at a link the attacker
+        // controls.
+        token.receiveWithAuthorization(
+            from,
+            address(this),
+            total,
+            validAfter,
+            validBefore,
+            authorizationNonce(salt, claimSigner, amountPerPayment, interval, paymentsTotal, startNow),
+            signature
+        );
+        id = _openToClaim(from, claimSigner, amountPerPayment, interval, paymentsTotal, startNow);
     }
 
     /**

@@ -12,7 +12,8 @@
     "probe:ausd": "node scripts/probe-ausd.mjs",
     "lifecycle": "tsx scripts/lifecycle.ts",
     "get:ausd": "node scripts/get-ausd.mjs",
-    "claim-link": "tsx scripts/claim-link.ts"
+    "claim-link": "tsx scripts/claim-link.ts",
+    "deploy": "tsx scripts/deploy.ts"
   },
   "keywords": [],
   "author": "",

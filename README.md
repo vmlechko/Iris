@@ -246,6 +246,41 @@ read off chain via EIP-5267 rather than assumed.
 `contracts/MockAUSD.sol` remains for `npm run lifecycle -- --mock`, which is
 useful when the faucet is rate limited.
 
+## The three screens
+
+**Sending.** Amount, cadence, how many times. The line underneath says what
+lands today and what is set aside in total, because the number that matters to
+a sender is not the transfer, it is the promise they are making. Confirming
+signs an ERC-3009 authorization — no gas, no approval — and a relayer puts it
+on chain.
+
+**The link.** A URL with the claim key after the `#`. A fragment never reaches
+a server, an access log, or a `Referer` header; in a query string the key would
+be quietly published to everything in the path.
+
+**Receiving.** The link opens to what is waiting and one button. A passkey
+ceremony creates the account, the link's key signs that address, and a relayer
+submits the claim. Money due arrives in the same moment. The recipient installs
+nothing, holds no gas, and signs no transaction.
+
+Both sides work from an empty account: the recipient because they have nothing,
+the sender because there is no reason they should need to be different.
+`createToClaimWithAuthorization` is the gasless half of that, and the schedule
+is bound into the ERC-3009 nonce so a lifted authorization cannot be re-pointed
+at an attacker's link.
+
+### The relayer
+
+`app/api/relay/route.ts` pays for both. It never accepts a call — only
+arguments for one of three known actions, which it encodes itself, simulates,
+and refuses if it would revert. Rate limited per address and per IP. What keeps
+it honest is that it cannot cheat even if it wanted to: a claim carries the
+recipient inside the signature and a creation carries the schedule inside the
+nonce.
+
+The third action draws test AUSD from Agora's faucet so the demo can be run end
+to end. That one is scaffolding, and says so on screen.
+
 ## Key lifetime
 
 The account key is not something to hold. Deriving it costs a touch of a
