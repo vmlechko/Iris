@@ -74,7 +74,6 @@ export default function Send() {
   }, [amount]);
   const total = per * BigInt(count);
   const valid = per > 0n && count > 0;
-  const cadenceLabel = CADENCES.find((c) => c.seconds === cadence)?.label ?? "";
 
   async function create() {
     setBusy(true);
@@ -149,10 +148,11 @@ export default function Send() {
           >
             Share the link
           </button>
-          <Link className="ghost button" href="/">
-            Done
-          </Link>
         </div>
+
+        <Link className="quiet" href="/">
+          Done
+        </Link>
 
         <p className="note">
           The key that unlocks this money is in the link itself, after the “#”.
@@ -166,75 +166,74 @@ export default function Send() {
   return (
     <main className="wrap">
       <p className="eyebrow">New commitment</p>
-      <h1>
-        How much, <em>how often</em>?
-      </h1>
 
-      <label className="field">
-        <span>They receive</span>
-        <div className="amount">
+      <h1 className="sentence">
+        Set aside{" "}
+        <span className="edit">
           <span aria-hidden>$</span>
           <input
             inputMode="decimal"
             value={amount}
+            style={{ width: `${Math.max(1, amount.length)}ch` }}
             onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
             aria-label="Amount of each payment"
           />
-        </div>
-      </label>
-
-      <div className="segmented" role="group" aria-label="How often">
-        {CADENCES.map((c) => (
-          <button
-            key={c.seconds}
-            type="button"
-            className={c.seconds === cadence ? "on" : ""}
-            onClick={() => setCadence(c.seconds)}
+        </span>{" "}
+        for someone,{" "}
+        <em>arriving</em>{" "}
+        <span className="edit">
+          <select
+            value={cadence}
+            onChange={(e) => setCadence(Number(e.target.value))}
+            aria-label="How often"
           >
-            {c.label.replace("every ", "")}
-          </button>
-        ))}
-      </div>
+            {CADENCES.map((c) => (
+              <option key={c.seconds} value={c.seconds}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </span>{" "}
+        <span className="edit">
+          <input
+            inputMode="numeric"
+            value={count}
+            style={{ width: `${String(count).length}ch` }}
+            onChange={(e) => setCount(Math.min(600, Math.max(1, Number(e.target.value.replace(/\D/g, "")) || 1)))}
+            aria-label="How many payments"
+          />
+        </span>{" "}
+        times.
+      </h1>
 
-      <label className="field">
-        <span>How many times</span>
-        <div className="stepper">
-          <button type="button" onClick={() => setCount((n) => Math.max(1, n - 1))} aria-label="Fewer">
-            −
-          </button>
-          <strong>{count}</strong>
-          <button type="button" onClick={() => setCount((n) => Math.min(600, n + 1))} aria-label="More">
-            +
-          </button>
-        </div>
-      </label>
-
-      <p className="summary">
-        {money(per)} lands today, then {money(per)} {cadenceLabel}.
-        <br />
-        <strong>{money(total)}</strong> is set aside now, so every one of those is
-        already paid for.
+      <p className="lede">
+        {money(per)} lands today. <strong>{money(total)}</strong> is set aside
+        now, so every payment after it is already paid for.
       </p>
 
       {balance !== undefined && balance < total && (
         <p className="note">
-          You hold {formatUnits(balance, AUSD_DECIMALS)} AUSD, and this needs{" "}
+          You hold {formatUnits(balance, AUSD_DECIMALS)} AUSD and this needs{" "}
           {money(total)}.{" "}
           <button className="linkish" onClick={topUp} disabled={busy}>
             Get test AUSD
           </button>{" "}
-          — this is a testnet, so the money is not real.
+          — this is a testnet, so none of it is real money.
         </p>
       )}
 
       <div className="actions">
-        <button onClick={create} disabled={!valid || busy || (balance !== undefined && balance < total)}>
+        <button
+          onClick={create}
+          disabled={!valid || busy || (balance !== undefined && balance < total)}
+        >
           {busy ? "Confirming…" : "Set it aside with Face ID"}
         </button>
-        <Link className="ghost button" href="/">
-          Cancel
-        </Link>
       </div>
+
+      <Link className="quiet" href="/">
+        Cancel
+      </Link>
 
       {error && <p className="error">{error}</p>}
     </main>
