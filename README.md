@@ -246,6 +246,34 @@ read off chain via EIP-5267 rather than assumed.
 `contracts/MockAUSD.sol` remains for `npm run lifecycle -- --mock`, which is
 useful when the faucet is rate limited.
 
+## Key lifetime
+
+The account key is not something to hold. Deriving it costs a touch of a
+finger, so `lib/account.ts` zeroes its session on the way out of every entry
+point — including when the work it was opened for throws. What is left is a
+policy rather than a mechanism:
+
+| | |
+|---|---|
+| reading a balance or a history | no key at all |
+| moving money | a fresh prompt, every time |
+| several steps of one flow | one session, with an expiry the interface shows |
+
+`register()` and `restore()` return an address and nothing else. `withSigner()`
+lends a signer for one piece of work and zeroes it after — Mera throws
+`SESSION_ENDED` on any later use, so a stray reference is inert rather than
+dangerous. `Session.open(ttl)` covers a flow with several steps and closes
+itself when the time runs out, exposing `expiresAt` so the interface can say
+when: a session that vanishes without warning is worse than one that asks
+again.
+
+A per-transaction key is the wrong shape here — the key *is* the account, so a
+new one each time would mean a new address each time, and money sent yesterday
+would be stranded at yesterday's identity. What should be ephemeral is the
+key's residence in memory, not its value. The claim-link key is the opposite
+case and is genuinely per-commitment: generated for one link, single-use by
+construction, dead once claimed.
+
 ## Security
 
 The contract holds other people's money, so it was reviewed rather than

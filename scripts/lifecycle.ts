@@ -131,7 +131,7 @@ async function main() {
 
   // ---- the recipient can find it with nothing stored ----------------------
   const incoming = await read(iris, I, "incomingOf", [recipient.address]);
-  check(incoming.length === 1 && incoming[0] === id, "commitment is discoverable from the address alone");
+  check(incoming.length === 1 && BigInt(incoming[0]) === id, "commitment is discoverable from the address alone");
 
   // ---- nothing is due yet -------------------------------------------------
   // Compare against chain time rather than assuming the preceding transactions
@@ -221,7 +221,7 @@ async function main() {
   await send(iris, I, "cancel", [id]);
   const after = await read(ausd, A, "balanceOf", [sponsor.address]);
   c = await read(iris, I, "get", [id]);
-  line("refunded to sender", usd(after - before));
+  line("refunded to sender", usd((after as bigint) - (before as bigint)));
   check(c.cancelled === true, "commitment is cancelled");
   check(
     (await read(ausd, A, "balanceOf", [iris])) === 0n,

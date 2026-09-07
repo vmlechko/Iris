@@ -1,22 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import type { LocalAccount } from "viem";
-import { createAccount, restoreAccount, NoPrfError } from "@/lib/account";
+import type { Address } from "viem";
+import { register, restore, NoPrfError } from "@/lib/account";
 
 type State =
   | { status: "anonymous" }
   | { status: "working" }
-  | { status: "ready"; account: LocalAccount }
+  | { status: "ready"; address: Address }
   | { status: "error"; message: string; recoverable: boolean };
 
 export default function Home() {
   const [state, setState] = useState<State>({ status: "anonymous" });
 
-  const run = async (fn: () => Promise<LocalAccount>) => {
+  const run = async (fn: () => Promise<Address>) => {
     setState({ status: "working" });
     try {
-      setState({ status: "ready", account: await fn() });
+      // Only the address is kept. The key was zeroed before this resolved, and
+      // is derived again — with a fresh prompt — when money actually moves.
+      setState({ status: "ready", address: await fn() });
     } catch (e) {
       const err = e as Error;
       // A dismissed passkey sheet is not a failure worth shouting about.
@@ -34,10 +36,11 @@ export default function Home() {
     return (
       <main className="wrap">
         <p className="eyebrow">Your account</p>
-        <p className="address">{state.account.address}</p>
+        <p className="address">{state.address}</p>
         <p className="note">
-          Nothing was stored on this device. Clear your browser data, open Iris
-          somewhere else, and the same passkey brings you back here.
+          Nothing was stored on this device, and no key is being held. Clear your
+          browser data, open Iris somewhere else, and the same passkey brings you
+          back here.
         </p>
         <button className="ghost" onClick={() => setState({ status: "anonymous" })}>
           Sign out
@@ -58,14 +61,14 @@ export default function Home() {
 
       <div className="actions">
         <button
-          onClick={() => run(createAccount)}
+          onClick={() => run(register)}
           disabled={state.status === "working"}
         >
           {state.status === "working" ? "Waiting…" : "Continue with Face ID"}
         </button>
         <button
           className="ghost"
-          onClick={() => run(restoreAccount)}
+          onClick={() => run(restore)}
           disabled={state.status === "working"}
         >
           I already have an account
