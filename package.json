@@ -10,7 +10,8 @@
     "compile": "node scripts/compile.mjs",
     "spike:7702": "tsx scripts/spike-7702.ts",
     "probe:ausd": "node scripts/probe-ausd.mjs",
-    "lifecycle": "tsx scripts/lifecycle.ts"
+    "lifecycle": "tsx scripts/lifecycle.ts",
+    "get:ausd": "node scripts/get-ausd.mjs"
   },
   "keywords": [],
   "author": "",

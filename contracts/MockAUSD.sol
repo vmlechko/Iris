@@ -81,10 +81,17 @@ contract MockAUSD {
         uint256 validAfter,
         uint256 validBefore,
         bytes32 nonce,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
+        bytes calldata signature
     ) external {
+        require(signature.length == 65, "bad signature length");
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+        assembly {
+            r := calldataload(signature.offset)
+            s := calldataload(add(signature.offset, 32))
+            v := byte(0, calldataload(add(signature.offset, 64)))
+        }
         require(to == msg.sender, "caller must be payee");
         require(block.timestamp > validAfter, "not yet valid");
         require(block.timestamp < validBefore, "expired");

@@ -8,6 +8,8 @@ interface IAUSD {
 
     /// @dev ERC-3009. `to` must equal msg.sender, which is what makes it
     ///      front-running safe: nobody else can submit this authorization.
+    ///      The `bytes` form is used over `(v, r, s)` because it also accepts
+    ///      ERC-1271 signatures, so a smart account can fund a commitment.
     function receiveWithAuthorization(
         address from,
         address to,
@@ -15,9 +17,7 @@ interface IAUSD {
         uint256 validAfter,
         uint256 validBefore,
         bytes32 nonce,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
+        bytes calldata signature
     ) external;
 }
 
@@ -126,9 +126,7 @@ contract IrisCommitments {
         uint256 validAfter,
         uint256 validBefore,
         bytes32 nonce,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
+        bytes calldata signature
     ) external returns (uint256 id) {
         uint256 total = _validateFor(from, recipient, amountPerPayment, interval, paymentsTotal);
         token.receiveWithAuthorization(
@@ -138,9 +136,7 @@ contract IrisCommitments {
             validAfter,
             validBefore,
             nonce,
-            v,
-            r,
-            s
+            signature
         );
         id = _open(from, recipient, amountPerPayment, interval, paymentsTotal, startNow);
     }

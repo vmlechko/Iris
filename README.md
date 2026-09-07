@@ -191,10 +191,23 @@ becoming claimable in one call.
 
 ### AUSD
 
-Iris settles in Agora's AUSD. Until access to Agora's staging environment
-lands, `contracts/MockAUSD.sol` stands in for it — six decimals and the same
-ERC-3009 path, and nothing else. The real address is already verified on chain
-and recorded above.
+Iris settles in Agora's real AUSD, and the lifecycle above runs against it, not
+a stand-in. Agora's faucet is documented for Sepolia only, but the same
+contract is deployed and funded on Monad testnet, so no whitelisting was
+needed:
+
+```bash
+npm run get:ausd    # requestFunds(recipient) → 10,000 AUSD
+```
+
+Two details cost time and are worth writing down. The faucet's argument is the
+recipient, not the asset. And the EIP-712 domain is named **"Agora Dollar"**,
+not "AUSD" — signing against the wrong name fails as `InvalidSignature()`,
+which reads like a broken signature rather than a wrong domain. The domain is
+read off chain via EIP-5267 rather than assumed.
+
+`contracts/MockAUSD.sol` remains for `npm run lifecycle -- --mock`, which is
+useful when the faucet is rate limited.
 
 ## Authenticator support, measured
 
