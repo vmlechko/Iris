@@ -246,6 +246,40 @@ read off chain via EIP-5267 rather than assumed.
 `contracts/MockAUSD.sol` remains for `npm run lifecycle -- --mock`, which is
 useful when the faucet is rate limited.
 
+## Running it
+
+```bash
+npm install
+npm run dev          # http://localhost:3000
+```
+
+Open it in **Safari**. In Chrome it works too, but the passkey has to be saved
+to iCloud Keychain — Chrome's own profile store cannot do PRF, and a passkey
+created there will not rebuild the account. The six-digit PIN prompt is the
+tell.
+
+### Deploying
+
+Any Next.js host. One environment variable is required:
+
+| | |
+|---|---|
+| `SPONSOR_PK` | the relayer's key — see below |
+| `MONAD_RPC_URL` | optional, defaults to the public testnet RPC |
+| `NEXT_PUBLIC_IRIS_ADDRESS` | optional, defaults to the deployed contract |
+
+Two things are worth settling before anyone else uses a deployment.
+
+**The domain is part of the account.** A passkey is bound to the hostname it
+was created on, so moving to a different address orphans every account made at
+the old one. Pick the URL once.
+
+**The relayer is a hot wallet.** Anything the server can sign, the internet can
+ask it to sign, and the throttle in `app/api/relay/route.ts` lives in process
+memory — on a serverless host that is close to no throttle at all. Give the
+deployment its own key rather than a development one, keep the balance small,
+and move the throttle into a durable store before this ever touches real money.
+
 ## The three screens
 
 **Sending.** Amount, cadence, how many times. The line underneath says what
@@ -280,6 +314,35 @@ nonce.
 
 The third action draws test AUSD from Agora's faucet so the demo can be run end
 to end. That one is scaffolding, and says so on screen.
+
+## The scheduler
+
+A commitment says when the next payment is due; something still has to push it.
+Doing that from our own server would put the product's central promise behind an
+uptime guarantee nobody outside can check — the recipient would be trusting us
+again, which is the thing escrow was meant to remove.
+
+So the schedule runs as a **Chainlink CRE workflow** (`cre/workflow`). On each
+tick it asks Iris which commitments have come due, fetches the day's exchange
+rate for the recipient's currency, and delivers both to `IrisScheduler` in one
+signed report.
+
+The rate is not decoration. What a recipient cares about is the number in their
+own currency, and recording the rate at the moment of settlement makes that
+figure checkable afterwards rather than something the interface drew. It is also
+what makes this an orchestration layer rather than a cron job: chain state and
+an outside data source meet in one place, under consensus — every node fetches
+the rate and the results are reduced by median, so a single misbehaving source
+cannot move what gets written.
+
+`dueBatch(offset, limit)` exists for this. A scheduler asking about each
+commitment separately would make one request per commitment per tick; the range
+is walked on chain instead and only what is worth acting on comes back.
+
+Releasing stays permissionless, so the scheduler holds no power over anyone's
+money. If the workflow stops, payments are pushed by whoever wants them
+pushed — the recipient included. `IrisScheduler` also swallows a failure on any
+single commitment, so one that cannot pay does not hold up the rest of the batch.
 
 ## Key lifetime
 

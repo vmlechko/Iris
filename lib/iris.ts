@@ -4,7 +4,7 @@ import { irisAbi } from "./iris-abi";
 
 export const IRIS: Address =
   (process.env.NEXT_PUBLIC_IRIS_ADDRESS as Address) ??
-  "0xa3d15bb80f56931f3221f69aeca20f040eece9b5";
+  "0x7ed55fed7346ef9b5d4a92771486dcbb1c7b6c14";
 
 export { irisAbi, AUSD, AUSD_DECIMALS };
 

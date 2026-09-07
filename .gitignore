@@ -12,3 +12,5 @@ spikes/*/dist/
 next-env.d.ts
 public/sw.js
 public/sw.js.map
+cre/workflow/node_modules/
+cre/**/.cre_build_tmp.js

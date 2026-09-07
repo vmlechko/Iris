@@ -1,0 +1,5 @@
+# CRE project settings for the Iris scheduler.
+staging-settings:
+  rpcs:
+    - chain-name: monad-testnet
+      url: https://testnet-rpc.monad.xyz

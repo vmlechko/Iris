@@ -444,6 +444,37 @@ contract IrisCommitments {
         return _incoming[recipient];
     }
 
+    /**
+     * @notice Every commitment with a payment due right now, in one call.
+     * @dev A scheduler asking about each commitment separately would make one
+     *      request per commitment per tick. This walks the range on chain
+     *      instead and returns only what is worth acting on.
+     * @param offset Where to start, so a long list can be walked in pages.
+     * @param limit How many to examine, not how many are returned.
+     */
+    function dueBatch(uint256 offset, uint256 limit)
+        external
+        view
+        returns (uint256[] memory ids, uint256 examined)
+    {
+        uint256 end = offset + limit;
+        if (end > _commitments.length) end = _commitments.length;
+        examined = end > offset ? end - offset : 0;
+
+        uint256[] memory found = new uint256[](examined);
+        uint256 n;
+        for (uint256 id = offset; id < end; ++id) {
+            Commitment storage c = _commitments[id];
+            if (c.cancelled || c.recipient == address(0)) continue;
+            if (c.paymentsMade >= c.paymentsTotal) continue;
+            if (block.timestamp < c.nextPaymentAt) continue;
+            found[n++] = id;
+        }
+
+        ids = new uint256[](n);
+        for (uint256 i = 0; i < n; ++i) ids[i] = found[i];
+    }
+
     /// @notice What is claimable right now, for a caller deciding whether to
     ///         spend gas on `release`.
     function releasable(uint256 id) external view returns (uint128) {
