@@ -9,7 +9,8 @@
     "lint": "next lint",
     "compile": "node scripts/compile.mjs",
     "spike:7702": "tsx scripts/spike-7702.ts",
-    "probe:ausd": "node scripts/probe-ausd.mjs"
+    "probe:ausd": "node scripts/probe-ausd.mjs",
+    "lifecycle": "tsx scripts/lifecycle.ts"
   },
   "keywords": [],
   "author": "",
@@ -17,27 +18,27 @@
   "description": "Cross-border support the recipient can see coming. Passkey accounts, AUSD, commitments on Monad.",
   "dependencies": {
     "@category-labs/mera": "^0.2.0",
-    "dotenv": "^17.4.2",
-    "viem": "^2.56.3",
     "@serwist/next": "^9.0.15",
     "next": "14.2.33",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "viem": "^2.56.3",
     "web-push": "3.6.7"
   },
   "devDependencies": {
     "@types/node": "^20",
-    "solc": "^0.8.36",
-    "tsx": "^4.23.13",
-    "typescript": "^5",
     "@types/react": "18.3.27",
     "@types/react-dom": "18.3.7",
     "@types/web-push": "^3.6.4",
+    "dotenv": "^17.4.2",
     "eslint": "^8",
     "eslint-config-next": "14.2.33",
     "postcss": "^8",
     "serwist": "^9.0.15",
-    "tailwindcss": "^3.4.1"
+    "solc": "^0.8.36",
+    "tailwindcss": "^3.4.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5"
   },
   "private": true
 }

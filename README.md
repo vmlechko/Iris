@@ -22,7 +22,7 @@ The account layer is proven end to end. Building the product on top of it now.
 - [x] Spike: EIP-7702 sponsored gas for a zero-balance account — **passed**
 - [x] Mera passkey onboarding in the browser — **stateless test passes**
 - [x] PWA shell with Mera as the account layer
-- [ ] Commitment escrow contract
+- [x] Commitment escrow contract
 - [ ] Recipient flow
 - [ ] Sender flow
 
@@ -144,6 +144,57 @@ Together with the 7702 result above, the whole account layer now rests on
 measurements rather than assumptions: a passkey produces a stable key, the key
 is a plain EOA, 7702 gives that EOA smart-contract behaviour, and a sponsor
 pays for it.
+
+## The commitment contract
+
+`contracts/IrisCommitments.sol`. A bank transfer is a promise; a commitment
+here is money already set aside. The whole schedule is escrowed at creation, so
+the recipient reads what is coming and when rather than being told.
+
+Three properties are deliberate:
+
+- **Releases are permissionless.** Once a payment is due, anyone may push it —
+  a scheduler, the sender, the recipient. Nobody has to be trusted to run a
+  keeper, and the recipient never signs or holds gas to be paid.
+- **Cancellation cannot claw back what is already owed.** A sender may stop
+  future payments and take back what is still unscheduled; a payment that has
+  come due is released to the recipient on the way out.
+- **State lives on chain and both sides are indexed.** `incomingOf` and
+  `outgoingOf` rebuild everything from an address, which is what lets the app
+  hold nothing locally.
+
+`create` pulls the schedule with an approval. `createWithAuthorization` takes a
+signed ERC-3009 authorization instead, so the sender needs neither gas nor a
+prior approval and a relayer submits on their behalf — the signer is the
+sender, never `msg.sender`.
+
+`scripts/lifecycle.ts` exercises all of it against Monad testnet — deployed
+contracts, mined transactions, state read back off the chain:
+
+```
+✓ recipient starts with 0 MON
+✓ first payment settled instantly
+✓ recipient still holds 0 MON
+✓ commitment is discoverable from the address alone
+✓ nothing releasable before the interval elapses
+✓ a payment comes due on schedule
+✓ release paid without the recipient signing anything
+✓ payer holds 0 MON        (gasless creation)
+✓ the signer is the sender, not the relayer
+✓ payer never paid gas
+✓ escrow is empty: everything went to the recipient or back to the sender
+```
+
+A missed scheduler window costs the recipient nothing: `release` catches up on
+every payment whose time has passed, which the run above shows as 400 AUSD
+becoming claimable in one call.
+
+### AUSD
+
+Iris settles in Agora's AUSD. Until access to Agora's staging environment
+lands, `contracts/MockAUSD.sol` stands in for it — six decimals and the same
+ERC-3009 path, and nothing else. The real address is already verified on chain
+and recorded above.
 
 ## Authenticator support, measured
 

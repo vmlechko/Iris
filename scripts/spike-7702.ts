@@ -20,7 +20,7 @@ import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { monadTestnet } from "viem/chains";
 import { readFileSync, appendFileSync, existsSync } from "node:fs";
 
-const artifacts = JSON.parse(readFileSync("artifacts/spike.json", "utf8"));
+const artifacts = JSON.parse(readFileSync("artifacts/contracts.json", "utf8"));
 
 const rpc = process.env.MONAD_RPC_URL ?? monadTestnet.rpcUrls.default.http[0];
 const publicClient = createPublicClient({ chain: monadTestnet, transport: http(rpc) });
