@@ -7,3 +7,8 @@ dist/
 .next/
 spikes/*/node_modules/
 spikes/*/dist/
+
+.next/
+next-env.d.ts
+public/sw.js
+public/sw.js.map

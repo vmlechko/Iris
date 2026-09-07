@@ -21,9 +21,27 @@ The account layer is proven end to end. Building the product on top of it now.
 - [x] Project scaffold
 - [x] Spike: EIP-7702 sponsored gas for a zero-balance account — **passed**
 - [x] Mera passkey onboarding in the browser — **stateless test passes**
+- [x] PWA shell with Mera as the account layer
 - [ ] Commitment escrow contract
 - [ ] Recipient flow
 - [ ] Sender flow
+
+## Pre-existing code
+
+The PWA shell is adapted from Monad's official
+[`next-serwist-privy-embedded-wallet`](https://github.com/monad-developers/next-serwist-privy-embedded-wallet)
+template: the Serwist service worker (`app/sw.ts`), its Next config wiring, the
+offline route, the web-push handler and route, the install prompt, the Geist
+fonts and the icon set.
+
+Privy is not part of Iris. The template's authentication — `privy-provider.tsx`
+and `UseLoginPrivy.tsx` — was dropped and replaced by `lib/account.ts`, which
+derives the account from a passkey through Mera. The bounty asks for Mera to be
+the entire account layer, and two account layers would be one too many. The
+template's docs advertise a `no-privy` branch; only `main` exists.
+
+Everything else — the account layer, the contracts, the spikes, the product
+itself — was written during the hackathon period.
 
 ## Stack
 

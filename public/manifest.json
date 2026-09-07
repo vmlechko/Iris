@@ -1,0 +1,26 @@
+{
+  "name": "Iris — support that arrives on time",
+  "short_name": "Iris",
+  "description": "Send money across a border as a commitment the person on the other side can see coming.",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FBFBFA",
+  "theme_color": "#FBFBFA",
+  "start_url": "/",
+  "scope": "/",
+  "id": "/",
+  "icons": [
+    {
+      "src": "/icons/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
