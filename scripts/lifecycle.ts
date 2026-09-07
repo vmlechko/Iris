@@ -162,7 +162,14 @@ async function main() {
   await fund(payer.address, perPayment);
   check((await publicClient.getBalance({ address: payer.address })) === 0n, "payer holds 0 MON");
 
-  const nonce = generatePrivateKey();
+  // The nonce is not free: the contract requires it to be a hash of the whole
+  // schedule, so the signature covers who gets paid and not merely how much
+  // leaves the payer. Without that an observer could lift the authorization and
+  // open a commitment to themselves — proven in scripts/exploit-poc.ts.
+  const salt = generatePrivateKey();
+  const nonce = (await read(iris, I, "authorizationNonce", [
+    salt, recipient.address, perPayment, interval, 1, true,
+  ])) as Hex;
   const validBefore = BigInt(Math.floor(Date.now() / 1000) + 3600);
   const signature = await payer.signTypedData({
     domain: {
@@ -202,7 +209,7 @@ async function main() {
   }
 
   await send(iris, I, "createWithAuthorization", [
-    payer.address, recipient.address, perPayment, interval, 1, true, 0n, validBefore, nonce, signature,
+    payer.address, recipient.address, perPayment, interval, 1, true, 0n, validBefore, salt, signature,
   ]);
   const second = await read(iris, I, "get", [1n]);
   check(second.sender.toLowerCase() === payer.address.toLowerCase(), "the signer is the sender, not the relayer");

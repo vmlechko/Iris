@@ -246,6 +246,40 @@ read off chain via EIP-5267 rather than assumed.
 `contracts/MockAUSD.sol` remains for `npm run lifecycle -- --mock`, which is
 useful when the faucet is rate limited.
 
+## Security
+
+The contract holds other people's money, so it was reviewed rather than
+assumed correct. What that turned up:
+
+**An ERC-3009 authorization did not commit to who gets paid.** The signature
+covers moving `value` into this contract and nothing more, so an observer could
+lift it out of the mempool and open a commitment to *themselves* with it.
+`scripts/exploit-poc.ts` did exactly that and walked away with 40 AUSD on a live
+deployment. Fixed by requiring the authorization's nonce to equal
+`authorizationNonce(...)` — a hash of the recipient, amount, interval, count and
+start flag. The nonce is signed, so the schedule is signed with it, and the same
+script is now refused while the honest path still settles.
+
+**Catching up on missed payments was a loop.** One iteration per payment due
+meant a long-dormant commitment could cost more gas than a block allows and
+become impossible to release — the money would be stuck. Replaced with closed-form
+arithmetic, so a backlog of any size costs the same.
+
+**Schedule arithmetic could wrap.** `interval * paymentsTotal` was written into a
+`uint40` inside an `unchecked` block. Bounded to 366 days and 600 payments, which
+keeps the product an order of magnitude inside the type.
+
+Known and accepted, rather than fixed:
+
+- **A sender can front-run a claim with `cancel`.** Escrow guarantees the money
+  exists and is not spent elsewhere; it does not make it irrevocable before the
+  link is opened. The honest claim is that funds are *set aside*, not that they
+  cannot be withdrawn.
+- **AUSD can freeze an account.** A frozen recipient makes `release` revert, and
+  the commitment stalls until the freeze lifts. Iris cannot route around the
+  issuer of a regulated asset, and pretending otherwise would be worse.
+- **An unopened link holds the escrow indefinitely** until the sender cancels.
+
 ## Authenticator support, measured
 
 The account layer rests on the WebAuthn PRF extension, and PRF is not uniformly

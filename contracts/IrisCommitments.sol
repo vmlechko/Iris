@@ -94,6 +94,13 @@ contract IrisCommitments {
     error NotClaimed();
     error AlreadyClaimed();
     error BadClaimSignature();
+    error AuthorizationNotBound();
+    error ScheduleTooLong();
+
+    /// @dev Bounds that keep `interval * paymentsTotal` inside uint40, so the
+    ///      schedule arithmetic cannot silently wrap.
+    uint40 private constant MAX_INTERVAL = 366 days;
+    uint16 private constant MAX_PAYMENTS = 600;
 
     bytes32 private constant CLAIM_TYPEHASH =
         keccak256("Claim(uint256 id,address recipient)");
@@ -141,8 +148,18 @@ contract IrisCommitments {
     /// @param from The account that signed the authorization and funds the
     ///        schedule. It is deliberately not msg.sender: a relayer submits
     ///        this transaction and pays for it, while AUSD verifies the
-    ///        signature against `from`. The authorization names this contract
-    ///        as its recipient, so nobody else can replay it elsewhere.
+    ///        signature against `from`.
+    /// @param salt Chosen by the sender so two identical schedules do not
+    ///        collide on the same ERC-3009 nonce.
+    ///
+    /// @dev An ERC-3009 authorization only commits to moving `value` into this
+    ///      contract — it says nothing about who the commitment then pays. On
+    ///      its own that lets an observer copy the authorization out of the
+    ///      mempool and open a commitment to themselves with it.
+    ///
+    ///      So the nonce is not free: it must equal a hash of every parameter
+    ///      below. The nonce is signed, so the parameters are signed with it,
+    ///      and changing any of them invalidates the signature.
     function createWithAuthorization(
         address from,
         address recipient,
@@ -152,10 +169,18 @@ contract IrisCommitments {
         bool startNow,
         uint256 validAfter,
         uint256 validBefore,
-        bytes32 nonce,
+        bytes32 salt,
         bytes calldata signature
     ) external returns (uint256 id) {
         uint256 total = _validateFor(from, recipient, amountPerPayment, interval, paymentsTotal);
+        bytes32 nonce = authorizationNonce(
+            salt,
+            recipient,
+            amountPerPayment,
+            interval,
+            paymentsTotal,
+            startNow
+        );
         token.receiveWithAuthorization(
             from,
             address(this),
@@ -166,6 +191,34 @@ contract IrisCommitments {
             signature
         );
         id = _open(from, recipient, amountPerPayment, interval, paymentsTotal, startNow);
+    }
+
+    /**
+     * @notice The ERC-3009 nonce a sender must sign for `createWithAuthorization`.
+     * @dev Binding the schedule into the nonce is what stops the authorization
+     *      being lifted and pointed somewhere else.
+     */
+    function authorizationNonce(
+        bytes32 salt,
+        address recipient,
+        uint128 amountPerPayment,
+        uint40 interval,
+        uint16 paymentsTotal,
+        bool startNow
+    ) public view returns (bytes32) {
+        return
+            keccak256(
+                abi.encode(
+                    address(this),
+                    block.chainid,
+                    salt,
+                    recipient,
+                    amountPerPayment,
+                    interval,
+                    paymentsTotal,
+                    startNow
+                )
+            );
     }
 
     /**
@@ -262,22 +315,18 @@ contract IrisCommitments {
     function _releaseDue(uint256 id) private {
         Commitment storage c = _commitments[id];
 
-        uint16 due;
         // A scheduler that misses a window must not cost the recipient money,
-        // so catch up on every payment whose time has passed.
-        while (
-            c.paymentsMade + due < c.paymentsTotal &&
-            block.timestamp >= c.nextPaymentAt + uint256(c.interval) * due
-        ) {
-            unchecked {
-                ++due;
-            }
-        }
+        // so every payment whose time has passed is caught up at once. This is
+        // arithmetic rather than a loop: iterating once per missed payment
+        // would let a long-dormant commitment grow past the block gas limit and
+        // become impossible to release at all.
+        uint256 elapsed = block.timestamp - c.nextPaymentAt;
+        uint256 due = 1 + elapsed / c.interval;
+        uint256 left = c.paymentsTotal - c.paymentsMade;
+        if (due > left) due = left;
 
-        unchecked {
-            c.paymentsMade += due;
-            c.nextPaymentAt += uint40(uint256(c.interval) * due);
-        }
+        c.paymentsMade += uint16(due);
+        c.nextPaymentAt = uint40(uint256(c.nextPaymentAt) + uint256(c.interval) * due);
 
         uint128 amount = uint128(uint256(c.amountPerPayment) * due);
         if (!token.transfer(c.recipient, amount)) revert TransferFailed();
@@ -373,6 +422,7 @@ contract IrisCommitments {
         uint16 paymentsTotal
     ) private pure returns (uint256 total) {
         if (amountPerPayment == 0 || interval == 0 || paymentsTotal == 0) revert InvalidSchedule();
+        if (interval > MAX_INTERVAL || paymentsTotal > MAX_PAYMENTS) revert ScheduleTooLong();
         total = uint256(amountPerPayment) * paymentsTotal;
     }
 
@@ -409,6 +459,7 @@ contract IrisCommitments {
             interval == 0 ||
             paymentsTotal == 0
         ) revert InvalidSchedule();
+        if (interval > MAX_INTERVAL || paymentsTotal > MAX_PAYMENTS) revert ScheduleTooLong();
         total = uint256(amountPerPayment) * paymentsTotal;
     }
 
