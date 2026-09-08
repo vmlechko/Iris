@@ -16,15 +16,59 @@ Built for **Monad Metropolis 2026** — Track 02, Consumer Products & Payments.
 
 ## Status
 
-The account layer is proven end to end. Building the product on top of it now.
+Working end to end on Monad testnet.
 
-- [x] Project scaffold
-- [x] Spike: EIP-7702 sponsored gas for a zero-balance account — **passed**
-- [x] Mera passkey onboarding in the browser — **stateless test passes**
-- [x] PWA shell with Mera as the account layer
-- [x] Commitment escrow contract
-- [ ] Recipient flow
-- [ ] Sender flow
+- [x] Mera passkey accounts — the stateless test passes: wipe storage, sign in, same address
+- [x] Commitment escrow, with an exploit found against our own first version and fixed
+- [x] Sender flow — signs an ERC-3009 authorization, never holds gas
+- [x] Recipient flow — opens a link, never signs a transaction
+- [x] Cancellation without gas, through EIP-7702
+- [x] The schedule as a Chainlink CRE workflow, delivering reports on chain
+- [x] History through an Envio indexer, deployed
+- [ ] Deployed at a public address
+
+## Deployed on Monad testnet
+
+| | |
+|---|---|
+| `IrisCommitments` | [`0x7ed55fed7346ef9b5d4a92771486dcbb1c7b6c14`](https://testnet.monadexplorer.com/address/0x7ed55fed7346ef9b5d4a92771486dcbb1c7b6c14) |
+| `IrisScheduler` — production | [`0xd035ad453f188e54688601efc2865ee5af1196cf`](https://testnet.monadexplorer.com/address/0xd035ad453f188e54688601efc2865ee5af1196cf) |
+| `IrisScheduler` — simulation | [`0x9d1e5e57dda0f1a0e48e596982858cbc7a8e8e78`](https://testnet.monadexplorer.com/address/0x9d1e5e57dda0f1a0e48e596982858cbc7a8e8e78) |
+| `IrisDelegate` | [`0xc018dffd9d15e8b63be2252ebb28fb5e2367674c`](https://testnet.monadexplorer.com/address/0xc018dffd9d15e8b63be2252ebb28fb5e2367674c) |
+| AUSD (Agora) | [`0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC`](https://testnet.monadexplorer.com/address/0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC) |
+
+There are two schedulers because the Chainlink forwarder address is immutable in
+`IrisScheduler` and *is* its access control — `onReport` accepts a report from
+one address and nobody else. One trusts Monad testnet's real forwarder; the
+other trusts the mock forwarder, which is what lets a local simulation deliver a
+report on chain instead of being rejected.
+
+## For judges
+
+**Open it in Safari, or in Chrome and choose iCloud Keychain when it asks where
+to save the passkey.** This is not a preference. Iris derives its keys through
+the WebAuthn PRF extension, and a passkey saved into Chrome's own store comes
+back without PRF — the account would not be recoverable. Chrome asking you for a
+six-digit PIN is the sign it is about to do that.
+
+There is nothing else to set up. No wallet, no extension, no seed phrase, no test
+tokens to go and fetch: the demo tops itself up behind the scenes, because
+sending someone to a faucet in the middle of a payment is the one thing this
+project is arguing against.
+
+To see the whole thing:
+
+1. Open the app and continue with Face ID. That is the account.
+2. Send a commitment — an amount, a cadence, a number of payments.
+3. Copy the link it gives you and open it in a private window, or on another
+   device. That is the recipient, who has never used the app before.
+4. Continue with Face ID there. The first payment arrives as the link is opened.
+5. Back on the sender's screen, open the commitment to see what has already been
+   paid, and stop it if you like — the refund returns what has not yet come due.
+
+The recipient's account holds zero MON throughout, which you can check on the
+explorer. That is deliberate, and the reason is in *The account architecture*
+below.
 
 ## Pre-existing code
 
@@ -47,8 +91,10 @@ itself — was written during the hackathon period.
 
 - **Monad testnet** (chain `10143`)
 - **[Mera](https://docs.monad.xyz/guides/mera)** (`@category-labs/mera`) — passkey accounts, the entire account layer. No seed phrase, no extension.
-- **EIP-7702** — the recipient's EOA gains smart-contract behaviour and a sponsor pays gas, so a zero-balance account can claim.
-- **AUSD** (Agora) — settlement asset. `earnAUSD` for funds in flight.
+- **EIP-7702** — lets an account that holds nothing act for itself. Cancelling is the one thing only the sender may do, and `IrisDelegate` runs exactly the call they signed while a sponsor pays for it.
+- **AUSD** (Agora) — settlement asset, six decimals.
+- **Chainlink CRE** — the payment schedule runs as a workflow rather than on our server, so nobody has to trust our uptime.
+- **Envio HyperIndex** — payment history. Monad's public RPC caps `eth_getLogs` at a hundred blocks, and a schedule can run for a year.
 - **Next.js + Serwist** (PWA) — mobile experience, opened from a link.
 - **viem**, **Solidity**
 
@@ -71,8 +117,28 @@ recipient code            0xef0100 8d7d…   (7702 delegation designator)
 ```
 
 So the account layer is: **Mera derives a plain EOA from a passkey, EIP-7702 gives that
-EOA smart-contract behaviour, and a sponsor pays the gas.** No smart-account contract to
-deploy, no bundler, and Mera remains the entire account layer.
+EOA smart-contract behaviour when it needs it, and a sponsor pays the gas.** No
+smart-account contract to deploy, no bundler, and Mera remains the entire account layer.
+
+### Where each half actually goes
+
+The spike answered a question about the recipient, but the recipient turned out not to
+need it. Claiming carries the recipient's address inside a signature, so the relayer can
+submit `claim` for them and the contract verifies who it is for — no delegation
+required. The recipient signs nothing and holds nothing.
+
+EIP-7702 earns its place on the **sender's** side instead. Cancelling is the one thing
+only the sender may do — `IrisCommitments.cancel` checks `msg.sender` — and a relayer
+cannot stand in for them. `IrisDelegate` closes that: the sender signs the exact call,
+a sponsor submits it, and it runs as the sender's own account.
+
+The delegate is small on purpose, because the spike version of it was dangerous. That
+one had no access control at all, so anyone could have executed anything through a
+delegated account. The shipped one binds the account, the chain, the target, the
+calldata and a nonce into the digest it checks, keeps that nonce in the account's own
+storage, and rejects the upper half of the signature space. `scripts/cancel-gasless.ts`
+proves the path and then tries to abuse it — replaying the signature, and pointing it at
+a transfer of the refund. Both are rejected.
 
 ### One design rule this exposed
 
@@ -253,6 +319,17 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
+Checks worth running, none of which need a browser:
+
+```bash
+npm run lifecycle              # the escrow, end to end on testnet
+npm run claim-link             # claim links, including an attempt to steal one
+npx tsx scripts/exploit-poc.ts # the authorization exploit we found, still refuted
+npx tsx scripts/cancel-gasless.ts   # cancelling from an account holding nothing
+npx tsx scripts/cancel-relay.ts     # the same through the relayer (needs npm run dev)
+cd indexer && npm test         # the indexer's handlers, no database, no network
+```
+
 Open it in **Safari**. In Chrome it works too, but the passkey has to be saved
 to iCloud Keychain — Chrome's own profile store cannot do PRF, and a passkey
 created there will not rebuild the account. The six-digit PIN prompt is the
@@ -267,6 +344,14 @@ Any Next.js host. One environment variable is required:
 | `SPONSOR_PK` | the relayer's key — see below |
 | `MONAD_RPC_URL` | optional, defaults to the public testnet RPC |
 | `NEXT_PUBLIC_IRIS_ADDRESS` | optional, defaults to the deployed contract |
+| `NEXT_PUBLIC_IRIS_DELEGATE` | optional, defaults to the deployed delegate |
+| `NEXT_PUBLIC_INDEXER_URL` | optional, but **set it** — see below |
+
+The indexer URL deserves the warning. Envio gives every deployment its own
+address and a stable one is a paid feature, so any push that rebuilds the
+indexer changes the link. The default compiled into `lib/indexer.ts` is
+whichever deployment was current when it was written; set the variable rather
+than trusting it. Getting it wrong costs the history panel and nothing else.
 
 Two things are worth settling before anyone else uses a deployment.
 
@@ -280,7 +365,7 @@ memory — on a serverless host that is close to no throttle at all. Give the
 deployment its own key rather than a development one, keep the balance small,
 and move the throttle into a durable store before this ever touches real money.
 
-## The three screens
+## The screens
 
 **Sending.** Amount, cadence, how many times. The line underneath says what
 lands today and what is set aside in total, because the number that matters to
@@ -296,6 +381,12 @@ be quietly published to everything in the path.
 ceremony creates the account, the link's key signs that address, and a relayer
 submits the claim. Money due arrives in the same moment. The recipient installs
 nothing, holds no gas, and signs no transaction.
+
+**The commitment itself.** Opening one from either list shows what has already
+been paid — the date, which payment it was, and a link to the receipt. The
+sender also gets one destructive action, and it says what it does before it does
+it: stopping returns what has not yet come due, and cannot claw back a payment
+that has.
 
 Both sides work from an empty account: the recipient because they have nothing,
 the sender because there is no reason they should need to be different.
@@ -343,6 +434,33 @@ Releasing stays permissionless, so the scheduler holds no power over anyone's
 money. If the workflow stops, payments are pushed by whoever wants them
 pushed — the recipient included. `IrisScheduler` also swallows a failure on any
 single commitment, so one that cannot pay does not hold up the rest of the batch.
+
+## History
+
+The chain knows what a commitment *is* — how many payments have gone out, when
+the next one falls due. It is a poor place to ask what already *happened*. That
+lives in events, and Monad's public RPC hands those back a hundred blocks at a
+time, which is no way to read a schedule that runs for a year.
+
+So history comes from an Envio indexer, in `indexer/`. Four events fold into
+three entities: the commitment, one row per payment, and per-address running
+totals for both sides — the last because the app opens on them and a passkey
+account arrives with no local history to fall back on.
+
+The case worth reading the handlers for is a commitment opened through a claim
+link. It is created with a zero recipient, because the person it is for may not
+have an address yet, and only learns who it belongs to when the link is
+redeemed. No account is created for the zero address, and the recipient is
+counted once rather than twice.
+
+`npm test` in `indexer/` replays a whole commitment — created for nobody,
+claimed, paid twice, cancelled — with no database and no network, so the
+handlers can be checked without the Docker and API token that running the
+indexer itself needs. Envio Cloud builds it from this repository, so neither is
+needed there either.
+
+Reading history is a convenience, never a dependency: if the indexer is
+unreachable the interface still works, it simply cannot show the past.
 
 ## Key lifetime
 
