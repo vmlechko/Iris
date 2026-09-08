@@ -1,7 +1,7 @@
 import solc from "solc";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 
-const names = ["SpikeDelegate", "Probe", "IrisCommitments", "MockAUSD", "IrisScheduler"];
+const names = ["SpikeDelegate", "Probe", "IrisCommitments", "MockAUSD", "IrisScheduler", "IrisDelegate"];
 const sources = Object.fromEntries(
   names.map((n) => [`${n}.sol`, { content: readFileSync(`contracts/${n}.sol`, "utf8") }])
 );

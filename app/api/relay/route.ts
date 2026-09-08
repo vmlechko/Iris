@@ -1,5 +1,5 @@
 /**
- * The relayer. Three actions, no more.
+ * The relayer. Four actions, no more.
  *
  * Both halves of Iris work from an empty account: the person receiving arrives
  * through a passkey holding nothing, and the person sending signs rather than
@@ -12,15 +12,17 @@
  *
  * What keeps it honest is that the signatures do the real work. A claim carries
  * the recipient inside the signature; a creation carries the whole schedule
- * inside the ERC-3009 nonce. Even a relayer acting in bad faith cannot point
- * either one somewhere else.
+ * inside the ERC-3009 nonce; a cancellation carries the target and the calldata
+ * inside the digest IrisDelegate checks. Even a relayer acting in bad faith
+ * cannot point any of them somewhere else.
  */
 import { NextResponse } from "next/server";
-import { createWalletClient, http, isAddress, isHex, type Address, type Hex } from "viem";
+import { createWalletClient, encodeFunctionData, http, isAddress, isHex, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { monadTestnet } from "viem/chains";
 import { publicClient } from "@/lib/chain";
 import { IRIS, irisAbi } from "@/lib/iris";
+import { DELEGATE } from "@/lib/delegate";
 
 export const runtime = "nodejs";
 
@@ -88,6 +90,65 @@ function resolve(body: Record<string, unknown>): { call: Call; subject: string }
   }
 }
 
+const executeAbi = [
+  {
+    type: "function", name: "execute", stateMutability: "nonpayable",
+    inputs: [{ type: "address" }, { type: "bytes" }, { type: "uint256" }, { type: "bytes" }],
+    outputs: [{ type: "bytes" }],
+  },
+] as const;
+
+type Authorization = { chainId: number; nonce: number; r: Hex; s: Hex; yParity: number };
+
+const isAuthorization = (v: unknown): v is Authorization => {
+  if (typeof v !== "object" || v === null) return false;
+  const a = v as Record<string, unknown>;
+  return (
+    a.chainId === monadTestnet.id &&
+    typeof a.nonce === "number" && Number.isInteger(a.nonce) && a.nonce >= 0 &&
+    b32(a.r) && b32(a.s) &&
+    (a.yParity === 0 || a.yParity === 1)
+  );
+};
+
+/**
+ * Cancelling takes a different shape from the rest: it is a type-4 transaction
+ * carrying the sender's EIP-7702 authorization, not a plain call.
+ *
+ * The authorization only says "run IrisDelegate as me". What actually runs is
+ * decided by the signature the sender made over the calldata, and that calldata
+ * is built here rather than accepted from the caller — so this route can put
+ * one thing through a delegated account, a cancellation, and nothing else.
+ */
+async function cancellation(body: Record<string, unknown>) {
+  const { from, id, nonce, signature, authorization } = body;
+  if (!addr(from) || !uint(id) || !uint(nonce) || !sig(signature) || !isAuthorization(authorization)) {
+    return "Invalid cancellation." as const;
+  }
+
+  const commitment = (await publicClient.readContract({
+    address: IRIS, abi: irisAbi, functionName: "get", args: [BigInt(id)],
+  }).catch(() => null)) as { sender: Address; cancelled: boolean } | null;
+
+  if (!commitment) return "No such commitment." as const;
+  if (commitment.sender.toLowerCase() !== from.toLowerCase()) {
+    return "Only the sender can stop a commitment." as const;
+  }
+  if (commitment.cancelled) return "This is already stopped." as const;
+
+  const data = encodeFunctionData({ abi: irisAbi, functionName: "cancel", args: [BigInt(id)] });
+
+  return {
+    subject: from.toLowerCase(),
+    to: from,
+    data: encodeFunctionData({
+      abi: executeAbi, functionName: "execute",
+      args: [IRIS, data, BigInt(nonce), signature],
+    }),
+    authorization: { address: DELEGATE, ...authorization },
+  };
+}
+
 export async function POST(request: Request) {
   const key = process.env.SPONSOR_PK as Hex | undefined;
   if (!key) return NextResponse.json({ error: "Relayer is not configured." }, { status: 503 });
@@ -99,15 +160,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Malformed request." }, { status: 400 });
   }
 
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+  const account = privateKeyToAccount(key);
+  const wallet = createWalletClient({ account, chain: monadTestnet, transport: http(process.env.MONAD_RPC_URL) });
+
+  if (body.action === "cancel") {
+    const stop = await cancellation(body);
+    if (typeof stop === "string") return NextResponse.json({ error: stop }, { status: 400 });
+    if (throttled(ip) || throttled(stop.subject)) {
+      return NextResponse.json({ error: "Too many attempts. Try again shortly." }, { status: 429 });
+    }
+    try {
+      const hash = await wallet.sendTransaction({
+        authorizationList: [stop.authorization],
+        to: stop.to,
+        data: stop.data,
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== "success") {
+        return NextResponse.json({ error: "The cancellation did not go through." }, { status: 400 });
+      }
+      return NextResponse.json({ hash, status: receipt.status });
+    } catch (e) {
+      const reason = (e as { shortMessage?: string }).shortMessage ?? "This cannot be completed.";
+      return NextResponse.json({ error: reason }, { status: 400 });
+    }
+  }
+
   const resolved = resolve(body);
   if (typeof resolved === "string") return NextResponse.json({ error: resolved }, { status: 400 });
 
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
   if (throttled(ip) || throttled(resolved.subject)) {
     return NextResponse.json({ error: "Too many attempts. Try again shortly." }, { status: 429 });
   }
 
-  const account = privateKeyToAccount(key);
   const { call } = resolved;
 
   try {
@@ -120,7 +206,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: reason }, { status: 400 });
   }
 
-  const wallet = createWalletClient({ account, chain: monadTestnet, transport: http(process.env.MONAD_RPC_URL) });
   const hash = await wallet.writeContract({ ...call, account, chain: monadTestnet } as never);
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
 

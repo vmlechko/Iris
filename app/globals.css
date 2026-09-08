@@ -241,6 +241,34 @@ h2 {
   white-space: nowrap;
 }
 
+/* A row is a way in, but should not look like a control. The button carries
+   the layout so the whole line is the target, including on a phone. */
+
+.rowbutton {
+  all: unset;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  width: 100%;
+  cursor: pointer;
+  padding: 0.1rem 0;
+}
+
+.rowbutton:hover .rowmain strong { color: var(--accent); }
+
+.rowmain strong { transition: color 0.15s ease; }
+
+.block { display: block; }
+
+/* Stopping a commitment is the one destructive thing here, so it says so
+   rather than hiding behind the same blue as everything else. */
+
+button.danger {
+  background: var(--bad);
+  color: #fff;
+}
+
 /* --- the sentence ------------------------------------------------------ */
 
 /* Rather than a form, the commitment reads as a line of prose with the

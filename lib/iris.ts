@@ -39,8 +39,23 @@ export const CADENCES = [
   { label: "every 3 months", seconds: 90 * 24 * 3600 },
 ] as const;
 
-export const cadenceLabel = (seconds: number) =>
-  CADENCES.find((c) => c.seconds === seconds)?.label ?? `every ${Math.round(seconds / 86400)} days`;
+const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"}`;
+
+/**
+ * A cadence the offer screen did not produce — a testnet schedule a minute
+ * apart, say — still has to read as English. Rounding everything into days
+ * turned a minute into "every 0 days".
+ */
+export const cadenceLabel = (seconds: number) => {
+  const known = CADENCES.find((c) => c.seconds === seconds);
+  if (known) return known.label;
+  // "every 1 minute" is not how anyone says it.
+  const every = (n: number, unit: string) => (n === 1 ? `every ${unit}` : `every ${plural(n, unit)}`);
+  if (seconds >= 86400) return every(Math.round(seconds / 86400), "day");
+  if (seconds >= 3600) return every(Math.round(seconds / 3600), "hour");
+  if (seconds >= 60) return every(Math.round(seconds / 60), "minute");
+  return every(seconds, "second");
+};
 
 /** The struct as the contract returns it, before it is made comfortable. */
 type RawCommitment = {
@@ -99,9 +114,15 @@ export function whenNext(c: Commitment, now = Date.now()): string {
   if (c.paymentsMade >= c.paymentsTotal) return "complete";
   const ms = c.nextPaymentAt * 1000 - now;
   if (ms <= 0) return "due now";
+  // Something due later today is not "tomorrow", which is what rounding
+  // straight to days used to say.
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 60) return minutes <= 1 ? "in a minute" : `in ${plural(minutes, "minute")}`;
+  const hours = Math.round(ms / 3_600_000);
+  if (hours < 24) return hours === 1 ? "in an hour" : `in ${plural(hours, "hour")}`;
   const days = Math.ceil(ms / 86_400_000);
   if (days <= 1) return "tomorrow";
-  if (days < 14) return `in ${days} days`;
+  if (days < 14) return `in ${plural(days, "day")}`;
   const weeks = Math.round(days / 7);
-  return weeks < 9 ? `in ${weeks} weeks` : `in ${Math.round(days / 30)} months`;
+  return weeks < 9 ? `in ${plural(weeks, "week")}` : `in ${plural(Math.round(days / 30), "month")}`;
 }
