@@ -19,6 +19,11 @@ contracts:
 
 chains:
   - id: 10143
+    # Without this the deployment fell back to RPC, which for this chain means
+    # a 100-block eth_getLogs window across a million blocks. The endpoint
+    # serves monad-testnet; Envio just does not pick it by default here.
+    hypersync_config:
+      url: https://monad-testnet.hypersync.xyz
     # The deployment block was never recorded, and the public RPC prunes state
     # so it cannot be recovered with eth_getCode. This is the first block of
     # 4 September 2026, comfortably before the contract existed.
