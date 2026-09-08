@@ -10,9 +10,18 @@
  * convenience: if it is unreachable the interface still works, it simply cannot
  * show what has already happened.
  */
+/**
+ * Envio gives every deployment its own address, and a stable one is a paid
+ * feature. This default is whichever deployment was current when it was
+ * written, and it only stays right while that deployment lives — redeploy the
+ * indexer and it is stale. Set NEXT_PUBLIC_INDEXER_URL rather than trusting it.
+ *
+ * The indexer only needs redeploying when `indexer/` itself changes; a push
+ * that touches only the app can leave the running deployment alone.
+ */
 const ENDPOINT =
   process.env.NEXT_PUBLIC_INDEXER_URL ??
-  "https://indexer.dev.hyperindex.xyz/9d337f5/v1/graphql";
+  "https://indexer.dev.hyperindex.xyz/415483c/v1/graphql";
 
 export type Payment = {
   id: string;
