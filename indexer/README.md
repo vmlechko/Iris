@@ -18,6 +18,21 @@ have an address yet, and only learns who it belongs to when the link is
 redeemed. `recipient` stays null until then, no account is created for the zero
 address, and the recipient is counted exactly once.
 
+## Where it runs
+
+Envio Cloud builds this from the repository, so nothing here needs Docker or an
+API token — that is only for running it locally.
+
+| | |
+|---|---|
+| Root directory | `indexer` |
+| Config file | `config.yaml` |
+| Deployment branch | `main` |
+| Plan | Development |
+
+A push to `main` triggers a build. The indexer is public, so the GraphQL
+endpoint can be opened and queried by anyone with the link.
+
 ## Running the tests
 
 ```
