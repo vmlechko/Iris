@@ -53,7 +53,8 @@ async function main() {
 
   const hash = await wallet.writeContract({
     address: IRIS, abi: irisAbi, functionName: "create",
-    args: [recipient, AMOUNT, INTERVAL, PAYMENTS, true],
+    args: [recipient, AMOUNT, INTERVAL, PAYMENTS, true,
+           { from: "Iris", about: "a schedule for the workflow to find" }],
   });
   const receipt = await pub.waitForTransactionReceipt({ hash });
   console.log(`created in block ${receipt.blockNumber}, gas ${receipt.gasUsed}`);

@@ -293,6 +293,23 @@ button.danger {
 
 .details .address { margin-top: 0.6rem; }
 
+/* A second, quieter line of the same sentence — the signature under the
+   promise rather than part of it. */
+.sentence.aside {
+  font-size: clamp(1.05rem, 3.5vw, 1.35rem);
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--muted);
+}
+
+/* Punctuation belongs to the word before it, not to the next line. */
+.nowrap { white-space: nowrap; }
+
+.sentence.aside .edit input::placeholder {
+  color: color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
 /* --- waiting ----------------------------------------------------------- */
 
 /* A rail of checkpoints. The line between them fills as they are passed, so

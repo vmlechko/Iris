@@ -22,6 +22,8 @@ async function main() {
   const receipt = await pub.waitForTransactionReceipt({ hash });
   console.log("IrisCommitments:", receipt.contractAddress);
   console.log("explorer:", `${monadTestnet.blockExplorers.default.url}/address/${receipt.contractAddress}`);
+  // Recorded here so the indexer never has to bisect for it again.
+  console.log("block:", receipt.blockNumber.toString());
 
 }
 

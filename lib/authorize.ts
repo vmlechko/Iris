@@ -6,7 +6,7 @@
  * leaves the payer. Without that binding an observer could lift the
  * authorization and open a commitment to themselves.
  */
-import type { Address, Hex, LocalAccount } from "viem";
+import { encodeAbiParameters, keccak256, parseAbiParameters, toBytes, type Address, type Hex, type LocalAccount } from "viem";
 import { publicClient, AUSD } from "./chain";
 import { IRIS, irisAbi } from "./iris";
 import { monadTestnet } from "viem/chains";
@@ -25,13 +25,32 @@ const TYPES = {
   ],
 } as const;
 
+/** What the sender says about the commitment. Both halves may be empty. */
+export type Note = { from: string; about: string };
+
 export type Schedule = {
   claimSigner: Address;
   amountPerPayment: bigint;
   interval: number;
   paymentsTotal: number;
   startNow: boolean;
+  note: Note;
 };
+
+/**
+ * Mirrors `IrisCommitments.noteHash`.
+ *
+ * Computed here rather than read from the contract: it is a pure function of
+ * two strings, and a round trip to ask the chain what a hash is would be one
+ * more thing to go wrong between the person typing and the signature.
+ */
+export const noteHash = (note: Note): Hex =>
+  keccak256(
+    encodeAbiParameters(parseAbiParameters("bytes32 from, bytes32 about"), [
+      keccak256(toBytes(note.from)),
+      keccak256(toBytes(note.about)),
+    ])
+  );
 
 export async function authorizeCommitment(account: LocalAccount, schedule: Schedule) {
   const salt = (`0x${crypto.getRandomValues(new Uint8Array(32)).reduce(
@@ -42,7 +61,8 @@ export async function authorizeCommitment(account: LocalAccount, schedule: Sched
     abi: irisAbi,
     functionName: "authorizationNonce",
     args: [salt, schedule.claimSigner, schedule.amountPerPayment,
-           schedule.interval, schedule.paymentsTotal, schedule.startNow],
+           schedule.interval, schedule.paymentsTotal, schedule.startNow,
+           noteHash(schedule.note)],
   })) as Hex;
 
   const validBefore = BigInt(Math.floor(Date.now() / 1000) + 3600);

@@ -22,6 +22,11 @@ import {
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { monadTestnet } from "viem/chains";
 import { readFileSync } from "node:fs";
+import { noteHash } from "../lib/authorize";
+
+/** Nothing said. The scripts exercise the schedule, not the wording. */
+const NO_NOTE = { from: "", about: "" };
+
 
 const artifacts = JSON.parse(readFileSync("artifacts/contracts.json", "utf8"));
 const rpc = process.env.MONAD_RPC_URL ?? monadTestnet.rpcUrls.default.http[0];
@@ -120,7 +125,7 @@ async function main() {
   console.log("\n  Creating a commitment: 200 AUSD × 3, first payment now\n");
   await fund(sponsor.address, perPayment * BigInt(payments));
   await send(ausd, A, "approve", [iris, perPayment * BigInt(payments)]);
-  await send(iris, I, "create", [recipient.address, perPayment, interval, payments, true]);
+  await send(iris, I, "create", [recipient.address, perPayment, interval, payments, true, NO_NOTE]);
 
   const id = 0n;
   let c = await read(iris, I, "get", [id]);
@@ -168,7 +173,7 @@ async function main() {
   // open a commitment to themselves — proven in scripts/exploit-poc.ts.
   const salt = generatePrivateKey();
   const nonce = (await read(iris, I, "authorizationNonce", [
-    salt, recipient.address, perPayment, interval, 1, true,
+    salt, recipient.address, perPayment, interval, 1, true, noteHash(NO_NOTE),
   ])) as Hex;
   const validBefore = BigInt(Math.floor(Date.now() / 1000) + 3600);
   const signature = await payer.signTypedData({
@@ -210,6 +215,7 @@ async function main() {
 
   await send(iris, I, "createWithAuthorization", [
     payer.address, recipient.address, perPayment, interval, 1, true, 0n, validBefore, salt, signature,
+    NO_NOTE,
   ]);
   const second = await read(iris, I, "get", [1n]);
   check(second.sender.toLowerCase() === payer.address.toLowerCase(), "the signer is the sender, not the relayer");

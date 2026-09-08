@@ -15,9 +15,9 @@ payments are pushed by whoever wants them pushed, the recipient included.
 
 | | |
 |---|---|
-| `IrisCommitments` | `0x7ed55fed7346ef9b5d4a92771486dcbb1c7b6c14` |
-| `IrisScheduler`, production | `0xd035ad453f188e54688601efc2865ee5af1196cf` |
-| `IrisScheduler`, simulation | `0x9d1e5e57dda0f1a0e48e596982858cbc7a8e8e78` |
+| `IrisCommitments` | `0x9f7f068b3297c77490b9606063e0f827a2db9a48` |
+| `IrisScheduler`, production | `0x67b9053d1e1232b5219bcc2be2e68365f48204b1` |
+| `IrisScheduler`, simulation | `0x0e7fc813ef8c28b0d41294feb86512afc3c3fd27` |
 
 There are two receivers because the forwarder is immutable and *is* the access
 control — `onReport` accepts a report from one address and nobody else. The

@@ -59,9 +59,27 @@ contract IrisCommitments {
         bool cancelled;
     }
 
+    /**
+     * @notice What the sender says about a commitment, in their own words.
+     *
+     * A transfer between two hex addresses tells the person receiving it
+     * nothing. This is who it is from and what it is for — the two things a
+     * bank statement gets right and a chain usually does not.
+     *
+     * It is public, permanently. The interface says so before anyone types
+     * into it, because "for the clinic" is not a thing to publish by accident.
+     */
+    struct Note {
+        string from;
+        string about;
+    }
+
     IAUSD public immutable token;
 
     Commitment[] private _commitments;
+
+    /// @dev Kept apart so the tightly packed Commitment struct stays that way.
+    mapping(uint256 => Note) private _notes;
 
     mapping(address => uint256[]) private _outgoing;
     mapping(address => uint256[]) private _incoming;
@@ -82,6 +100,7 @@ contract IrisCommitments {
         uint16 paymentsMade,
         uint40 nextPaymentAt
     );
+    event CommitmentNoted(uint256 indexed id, string from, string about);
     event CommitmentCancelled(uint256 indexed id, address indexed sender, uint256 refunded);
     event CommitmentClaimed(uint256 indexed id, address indexed recipient);
 
@@ -90,6 +109,7 @@ contract IrisCommitments {
     error NothingDue();
     error Completed();
     error InvalidSchedule();
+    error NoteTooLong();
     error TransferFailed();
     error NotClaimed();
     error AlreadyClaimed();
@@ -136,11 +156,13 @@ contract IrisCommitments {
         uint128 amountPerPayment,
         uint40 interval,
         uint16 paymentsTotal,
-        bool startNow
+        bool startNow,
+        Note calldata note
     ) external returns (uint256 id) {
         uint256 total = _validate(recipient, amountPerPayment, interval, paymentsTotal);
         if (!token.transferFrom(msg.sender, address(this), total)) revert TransferFailed();
         id = _open(msg.sender, recipient, amountPerPayment, interval, paymentsTotal, startNow);
+        _saveNote(id, note);
     }
 
     /// @notice Create a commitment from a signed ERC-3009 authorization, so the
@@ -170,7 +192,8 @@ contract IrisCommitments {
         uint256 validAfter,
         uint256 validBefore,
         bytes32 salt,
-        bytes calldata signature
+        bytes calldata signature,
+        Note calldata note
     ) external returns (uint256 id) {
         uint256 total = _validateFor(from, recipient, amountPerPayment, interval, paymentsTotal);
         bytes32 nonce = authorizationNonce(
@@ -179,7 +202,8 @@ contract IrisCommitments {
             amountPerPayment,
             interval,
             paymentsTotal,
-            startNow
+            startNow,
+            noteHash(note)
         );
         token.receiveWithAuthorization(
             from,
@@ -191,6 +215,7 @@ contract IrisCommitments {
             signature
         );
         id = _open(from, recipient, amountPerPayment, interval, paymentsTotal, startNow);
+        _saveNote(id, note);
     }
 
     /**
@@ -204,7 +229,8 @@ contract IrisCommitments {
         uint128 amountPerPayment,
         uint40 interval,
         uint16 paymentsTotal,
-        bool startNow
+        bool startNow,
+        bytes32 note
     ) public view returns (bytes32) {
         return
             keccak256(
@@ -216,9 +242,22 @@ contract IrisCommitments {
                     amountPerPayment,
                     interval,
                     paymentsTotal,
-                    startNow
+                    startNow,
+                    note
                 )
             );
+    }
+
+    /// @notice The note, reduced to one word for the nonce to carry.
+    /// @dev Without this a relayer could keep the schedule and rewrite who the
+    ///      money is from — the one field a recipient would actually act on.
+    function noteHash(Note calldata note) public pure returns (bytes32) {
+        return keccak256(abi.encode(keccak256(bytes(note.from)), keccak256(bytes(note.about))));
+    }
+
+    /// @notice What the sender said about a commitment. Empty if they said nothing.
+    function noteOf(uint256 id) external view returns (Note memory) {
+        return _notes[id];
     }
 
     /**
@@ -237,12 +276,14 @@ contract IrisCommitments {
         uint128 amountPerPayment,
         uint40 interval,
         uint16 paymentsTotal,
-        bool startNow
+        bool startNow,
+        Note calldata note
     ) external returns (uint256 id) {
         if (claimSigner == address(0)) revert InvalidSchedule();
         uint256 total = _validateSchedule(amountPerPayment, interval, paymentsTotal);
         if (!token.transferFrom(msg.sender, address(this), total)) revert TransferFailed();
         id = _openToClaim(msg.sender, claimSigner, amountPerPayment, interval, paymentsTotal, startNow);
+        _saveNote(id, note);
     }
 
     function _openToClaim(
@@ -302,7 +343,8 @@ contract IrisCommitments {
         uint256 validAfter,
         uint256 validBefore,
         bytes32 salt,
-        bytes calldata signature
+        bytes calldata signature,
+        Note calldata note
     ) external returns (uint256 id) {
         if (claimSigner == address(0) || from == address(0)) revert InvalidSchedule();
         uint256 total = _validateSchedule(amountPerPayment, interval, paymentsTotal);
@@ -316,10 +358,13 @@ contract IrisCommitments {
             total,
             validAfter,
             validBefore,
-            authorizationNonce(salt, claimSigner, amountPerPayment, interval, paymentsTotal, startNow),
+            authorizationNonce(
+                salt, claimSigner, amountPerPayment, interval, paymentsTotal, startNow, noteHash(note)
+            ),
             signature
         );
         id = _openToClaim(from, claimSigner, amountPerPayment, interval, paymentsTotal, startNow);
+        _saveNote(id, note);
     }
 
     /**
@@ -525,6 +570,21 @@ contract IrisCommitments {
         address signer = ecrecover(digest, v, r, sig_s);
         if (signer == address(0)) revert BadClaimSignature();
         return signer;
+    }
+
+    /// @dev Bounded so a note cannot be used to make creation arbitrarily
+    ///      expensive for whoever sponsors it, and so an interface has a length
+    ///      it can rely on.
+    uint256 private constant MAX_FROM = 32;
+    uint256 private constant MAX_ABOUT = 64;
+
+    function _saveNote(uint256 id, Note calldata note) private {
+        if (bytes(note.from).length > MAX_FROM || bytes(note.about).length > MAX_ABOUT) {
+            revert NoteTooLong();
+        }
+        if (bytes(note.from).length == 0 && bytes(note.about).length == 0) return;
+        _notes[id] = note;
+        emit CommitmentNoted(id, note.from, note.about);
     }
 
     function _validateFor(

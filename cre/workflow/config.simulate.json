@@ -5,8 +5,8 @@
   "evms": [
     {
       "chainSelectorName": "monad-testnet",
-      "irisAddress": "0x7ed55fed7346ef9b5d4a92771486dcbb1c7b6c14",
-      "schedulerAddress": "0x9d1e5e57dda0f1a0e48e596982858cbc7a8e8e78",
+      "irisAddress": "0x9f7f068b3297c77490b9606063e0f827a2db9a48",
+      "schedulerAddress": "0x0e7fc813ef8c28b0d41294feb86512afc3c3fd27",
       "scanLimit": 200,
       "gasLimit": "1000000"
     }

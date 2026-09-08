@@ -22,6 +22,10 @@ export default function Send() {
   const [amount, setAmount] = useState("200");
   const [cadence, setCadence] = useState<number>(CADENCES[1].seconds);
   const [count, setCount] = useState(6);
+  // Lengths match the contract's caps, so nobody types a sentence the chain
+  // will refuse after they have already touched a finger to it.
+  const [from, setFrom] = useState("");
+  const [about, setAbout] = useState("");
   const [busy, setBusy] = useState(false);
   /** Which named step the person is watching. -1 while nothing is running. */
   const [step, setStep] = useState(-1);
@@ -70,12 +74,14 @@ export default function Send() {
       // after the hash in a URL.
       const key = generatePrivateKey() as Hex;
       const claimSigner = addressOfKey(key);
+      const note = { from: from.trim(), about: about.trim() };
       const schedule = {
         claimSigner,
         amountPerPayment: per,
         interval: cadence,
         paymentsTotal: count,
         startNow: true,
+        note,
       };
 
       const { hash } = await withSigner(async (account) => {
@@ -93,6 +99,7 @@ export default function Send() {
           validBefore: auth.validBefore.toString(),
           salt: auth.salt,
           signature: auth.signature,
+          note,
         });
       });
 
@@ -195,6 +202,40 @@ export default function Send() {
         </span>{" "}
         times.
       </h1>
+
+      <p className="sentence aside">
+        They will see it comes from{" "}
+        <span className="nowrap">
+        <span className="edit">
+          <input
+            value={from}
+            maxLength={32}
+            placeholder="you"
+            size={Math.max(3, from.length || 3)}
+            onChange={(e) => setFrom(e.target.value)}
+            aria-label="Who it is from"
+          />
+        </span>
+        ,
+        </span>{" "}
+        for{" "}
+        <span className="edit">
+          <input
+            value={about}
+            maxLength={64}
+            placeholder="anything"
+            size={Math.max(8, about.length || 8)}
+            onChange={(e) => setAbout(e.target.value)}
+            aria-label="What it is for"
+          />
+          <span aria-hidden>.</span>
+        </span>
+      </p>
+
+      <p className="note">
+        Both are optional, and both are public forever — they travel with the
+        commitment so the person receiving it knows what arrived and why.
+      </p>
 
       <p className="lede">
         {money(per)} lands today. <strong>{money(total)}</strong> is set aside

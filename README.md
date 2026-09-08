@@ -31,9 +31,9 @@ Working end to end on Monad testnet.
 
 | | |
 |---|---|
-| `IrisCommitments` | [`0x7ed55fed7346ef9b5d4a92771486dcbb1c7b6c14`](https://testnet.monadexplorer.com/address/0x7ed55fed7346ef9b5d4a92771486dcbb1c7b6c14) |
-| `IrisScheduler` — production | [`0xd035ad453f188e54688601efc2865ee5af1196cf`](https://testnet.monadexplorer.com/address/0xd035ad453f188e54688601efc2865ee5af1196cf) |
-| `IrisScheduler` — simulation | [`0x9d1e5e57dda0f1a0e48e596982858cbc7a8e8e78`](https://testnet.monadexplorer.com/address/0x9d1e5e57dda0f1a0e48e596982858cbc7a8e8e78) |
+| `IrisCommitments` | [`0x9f7f068b3297c77490b9606063e0f827a2db9a48`](https://testnet.monadexplorer.com/address/0x9f7f068b3297c77490b9606063e0f827a2db9a48) |
+| `IrisScheduler` — production | [`0x67b9053d1e1232b5219bcc2be2e68365f48204b1`](https://testnet.monadexplorer.com/address/0x67b9053d1e1232b5219bcc2be2e68365f48204b1) |
+| `IrisScheduler` — simulation | [`0x0e7fc813ef8c28b0d41294feb86512afc3c3fd27`](https://testnet.monadexplorer.com/address/0x0e7fc813ef8c28b0d41294feb86512afc3c3fd27) |
 | `IrisDelegate` | [`0xc018dffd9d15e8b63be2252ebb28fb5e2367674c`](https://testnet.monadexplorer.com/address/0xc018dffd9d15e8b63be2252ebb28fb5e2367674c) |
 | AUSD (Agora) | [`0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC`](https://testnet.monadexplorer.com/address/0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC) |
 
@@ -373,9 +373,15 @@ a sender is not the transfer, it is the promise they are making. Confirming
 signs an ERC-3009 authorization — no gas, no approval — and a relayer puts it
 on chain.
 
-**The link.** A URL with the claim key after the `#`. A fragment never reaches
-a server, an access log, or a `Referer` header; in a query string the key would
-be quietly published to everything in the path.
+**The link.** `/claim/7#<key>`. The key is after the `#` because a fragment
+never reaches a server, an access log, or a `Referer` header; in a query string
+it would be quietly published to everything in the path.
+
+The commitment's number is in the path on purpose. When the link is pasted into
+a chat, the messenger fetches the page to draw a preview card — and a crawler
+never sees the fragment. With the number in the path the card can say who is
+sending what, which is where the person actually decides whether to tap. Nothing
+is given away: claiming needs the key, and the number is public on chain anyway.
 
 **Receiving.** The link opens to what is waiting and one button. A passkey
 ceremony creates the account, the link's key signs that address, and a relayer
@@ -434,6 +440,26 @@ Releasing stays permissionless, so the scheduler holds no power over anyone's
 money. If the workflow stops, payments are pushed by whoever wants them
 pushed — the recipient included. `IrisScheduler` also swallows a failure on any
 single commitment, so one that cannot pay does not hold up the rest of the batch.
+
+## What the sender says
+
+A transfer between two hex addresses tells the person receiving it nothing. So a
+commitment carries two optional lines the sender writes: who it is from, and
+what it is for. They are bounded — 32 bytes and 64 — stored on chain, and
+emitted for the indexer.
+
+They are also **public, permanently**, which the sending screen says before
+anyone types into it. "For the flat" is fine; a diagnosis is not, and an
+interface that failed to mention the difference would be the one at fault.
+
+The note is bound into the ERC-3009 nonce alongside the schedule. Without that a
+relayer could keep the amounts and rewrite who the money is from — the one field
+a recipient would actually act on. `scripts/cancel-relay.ts` signs one note,
+sends another, and checks the contract refuses it.
+
+It is what makes the chat card work: the preview a messenger draws is built from
+the chain, so the card reads *"Mum is setting aside $200 for you, every month"*
+before anyone has opened anything.
 
 ## History
 

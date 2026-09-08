@@ -50,6 +50,23 @@ const sig = (v: unknown): v is Hex => typeof v === "string" && isHex(v) && v.len
 const uint = (v: unknown): v is string => typeof v === "string" && /^\d+$/.test(v);
 const b32 = (v: unknown): v is Hex => typeof v === "string" && isHex(v) && v.length === 66;
 
+/**
+ * The note is the one field a recipient would act on — "from Mum" is the whole
+ * reason they trust the link. The contract binds it into the ERC-3009 nonce, so
+ * a relayer cannot rewrite it; this only refuses one the contract would refuse,
+ * before it costs anybody a transaction.
+ */
+type Note = { from: string; about: string };
+const note = (v: unknown): v is Note => {
+  if (typeof v !== "object" || v === null) return false;
+  const n = v as Record<string, unknown>;
+  return (
+    typeof n.from === "string" && typeof n.about === "string" &&
+    new TextEncoder().encode(n.from).length <= 32 &&
+    new TextEncoder().encode(n.about).length <= 64
+  );
+};
+
 type Call = { address: Address; abi: readonly unknown[]; functionName: string; args: readonly unknown[] };
 
 /** Translate a request into exactly one known call, or refuse it. */
@@ -66,16 +83,17 @@ function resolve(body: Record<string, unknown>): { call: Call; subject: string }
     }
     case "create": {
       const { from, claimSigner, amountPerPayment, interval, paymentsTotal, startNow, validBefore, salt, signature } = body;
+      const said = body.note ?? { from: "", about: "" };
       if (
         !addr(from) || !addr(claimSigner) || !uint(amountPerPayment) ||
         !uint(interval) || !uint(paymentsTotal) || typeof startNow !== "boolean" ||
-        !uint(validBefore) || !b32(salt) || !sig(signature)
+        !uint(validBefore) || !b32(salt) || !sig(signature) || !note(said)
       ) return "Invalid commitment.";
       return {
         subject: from.toLowerCase(),
         call: { address: IRIS, abi: irisAbi as readonly unknown[], functionName: "createToClaimWithAuthorization",
           args: [from, claimSigner, BigInt(amountPerPayment), Number(interval),
-                 Number(paymentsTotal), startNow, 0n, BigInt(validBefore), salt, signature] },
+                 Number(paymentsTotal), startNow, 0n, BigInt(validBefore), salt, signature, said] },
       };
     }
     case "fund": {

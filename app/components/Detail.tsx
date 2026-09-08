@@ -19,7 +19,7 @@ import { withSigner } from "@/lib/account";
 import { cancelCommitment } from "@/lib/delegate";
 import { paymentsFor, type Payment } from "@/lib/indexer";
 import Steps from "@/app/components/Steps";
-import { money, cadenceLabel, whenNext, remaining, type Commitment } from "@/lib/iris";
+import { money, cadenceLabel, whenNext, remaining, getNote, type Commitment, type Note } from "@/lib/iris";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const NOBODY = "0x0000000000000000000000000000000000000000";
@@ -52,10 +52,14 @@ export default function Detail({
 }) {
   const [history, setHistory] = useState<Payment[] | null | "loading">("loading");
   const [stopping, setStopping] = useState<Stopping>({ at: "idle" });
+  // Read from the chain rather than the indexer: this is one commitment, one
+  // call, and it should survive the indexer being down.
+  const [note, setNote] = useState<Note | undefined>();
 
   useEffect(() => {
     let live = true;
     paymentsFor(commitment.id).then((rows) => live && setHistory(rows));
+    getNote(commitment.id).then((n) => live && setNote(n)).catch(() => {});
     return () => { live = false; };
   }, [commitment.id]);
 
@@ -98,7 +102,8 @@ export default function Detail({
           ? commitment.recipient === NOBODY
             ? "The link has not been opened yet."
             : <>To {short(commitment.recipient)}.</>
-          : <>From {short(commitment.sender)}.</>}{" "}
+          : <>From {note?.from?.trim() || short(commitment.sender)}.</>}{" "}
+        {note?.about?.trim() ? <>For {note.about.trim()}. </> : null}
         {commitment.paymentsMade} of {commitment.paymentsTotal} sent
         {commitment.cancelled
           ? ". Stopped."

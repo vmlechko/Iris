@@ -21,7 +21,7 @@ const blankAccount = (id: string) => ({
   id,
   commitmentsSent: 0,
   commitmentsReceived: 0,
-  totalEscrowed: 0n,
+  totalCommitted: 0n,
   totalReceived: 0n,
 });
 
@@ -41,6 +41,10 @@ indexer.onEvent(
       id,
       sender,
       recipient,
+      // Filled by CommitmentNoted, which the contract emits in the same
+      // transaction when the sender said anything at all.
+      noteFrom: "",
+      noteAbout: "",
       amountPerPayment,
       interval: Number(event.params.interval),
       paymentsTotal,
@@ -60,7 +64,7 @@ indexer.onEvent(
     context.Account.set({
       ...from,
       commitmentsSent: from.commitmentsSent + 1,
-      totalEscrowed: from.totalEscrowed + amountPerPayment * BigInt(paymentsTotal),
+      totalCommitted: from.totalCommitted + amountPerPayment * BigInt(paymentsTotal),
     });
 
     // A commitment addressed to a known recipient counts for them immediately.
@@ -69,6 +73,25 @@ indexer.onEvent(
       const to = await context.Account.getOrCreate(blankAccount(recipient));
       context.Account.set({ ...to, commitmentsReceived: to.commitmentsReceived + 1 });
     }
+  },
+);
+
+indexer.onEvent(
+  { contract: "IrisCommitments", event: "CommitmentNoted" },
+  async ({ event, context }) => {
+    const id = event.params.id.toString();
+
+    const commitment = await context.Commitment.get(id);
+    if (!commitment) {
+      context.log.error(`note for unknown commitment ${id}`);
+      return;
+    }
+
+    context.Commitment.set({
+      ...commitment,
+      noteFrom: event.params.from,
+      noteAbout: event.params.about,
+    });
   },
 );
 
@@ -144,9 +167,9 @@ indexer.onEvent(
     const refunded = BigInt(event.params.refunded);
     context.Commitment.set({ ...commitment, cancelled: true, refunded });
 
-    // What was refunded was never really escrowed, as far as the sender's
-    // running total is concerned.
+    // What came back was never really promised, as far as the running total
+    // is concerned.
     const from = await context.Account.getOrCreate(blankAccount(commitment.sender));
-    context.Account.set({ ...from, totalEscrowed: from.totalEscrowed - refunded });
+    context.Account.set({ ...from, totalCommitted: from.totalCommitted - refunded });
   },
 );

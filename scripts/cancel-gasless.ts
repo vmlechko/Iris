@@ -91,13 +91,14 @@ async function main() {
   // The commitment is opened exactly as the app opens one: the sender signs,
   // the sponsor submits, no gas on the sender's side.
   const claimSigner = privateKeyToAccount(generatePrivateKey()).address;
-  const schedule = { claimSigner, amountPerPayment, interval: 3600, paymentsTotal, startNow: false };
+  const note = { from: "A test", about: "proving a cancellation" };
+  const schedule = { claimSigner, amountPerPayment, interval: 3600, paymentsTotal, startNow: false, note };
   const { salt, validBefore, signature } = await authorizeCommitment(sender, schedule);
 
   const createHash = await sponsorWallet.writeContract({
     address: IRIS, abi: irisAbi, functionName: "createToClaimWithAuthorization",
     args: [sender.address, claimSigner, amountPerPayment, 3600, paymentsTotal, false,
-           0n, validBefore, salt, signature],
+           0n, validBefore, salt, signature, note],
   });
   await pub.waitForTransactionReceipt({ hash: createHash });
 

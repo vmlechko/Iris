@@ -17,6 +17,13 @@ type Commitment {
   """
   recipient: String
 
+  """
+  What the sender said: who it is from, and what it is for. Either may be
+  empty — the interface asks, it does not insist.
+  """
+  noteFrom: String!
+  noteAbout: String!
+
   amountPerPayment: BigInt!
   interval: Int!
   paymentsTotal: Int!
@@ -64,6 +71,11 @@ type Account {
   id: ID!
   commitmentsSent: Int!
   commitmentsReceived: Int!
-  totalEscrowed: BigInt!
+
+  """
+  Everything this address has ever promised, net of what came back on
+  cancellation. Not what is escrowed right now — releases do not reduce it.
+  """
+  totalCommitted: BigInt!
   totalReceived: BigInt!
 }

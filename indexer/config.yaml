@@ -13,21 +13,22 @@ contracts:
     handler: src/handlers.ts
     events:
       - event: "CommitmentCreated(uint256 indexed id, address indexed sender, address indexed recipient, uint128 amountPerPayment, uint40 interval, uint16 paymentsTotal, uint40 firstPaymentAt)"
+      - event: "CommitmentNoted(uint256 indexed id, string from, string about)"
       - event: "CommitmentClaimed(uint256 indexed id, address indexed recipient)"
       - event: "PaymentReleased(uint256 indexed id, address indexed recipient, uint128 amount, uint16 paymentsMade, uint40 nextPaymentAt)"
       - event: "CommitmentCancelled(uint256 indexed id, address indexed sender, uint256 refunded)"
 
 chains:
   - id: 10143
-    # The deployment block was never recorded, and the public RPC prunes state
-    # so it cannot be recovered with eth_getCode. This is the first block of
-    # 4 September 2026, comfortably before the contract existed.
-    # See scripts/start-block.mjs in the repository root.
-    start_block: 59479001
+    # The block the contract was deployed in, printed by scripts/deploy.ts.
+    # (Recovering it afterwards is awkward: the public RPC prunes state, so
+    # eth_getCode on an old block fails — scripts/start-block.mjs bisects on
+    # block timestamps instead.)
+    start_block: 60827600
     contracts:
       - name: IrisCommitments
         address:
-          - "0x7ed55fed7346ef9b5d4a92771486dcbb1c7b6c14"
+          - "0x9f7f068b3297c77490b9606063e0f827a2db9a48"
 
 field_selection:
   transaction_fields:

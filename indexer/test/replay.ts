@@ -18,7 +18,8 @@ const NOBODY = "0x0000000000000000000000000000000000000000" as const;
 const AUSD = (whole: number) => BigInt(whole) * 1_000_000n;
 const MONTH = 30 * 24 * 60 * 60;
 const START = 1_757_000_000;
-const FIRST_BLOCK = 59_479_100;
+/** Above the config's start_block, or the simulator filters every event out. */
+const FIRST_BLOCK = 60_827_700;
 
 let checks = 0;
 let failures = 0;
@@ -65,6 +66,14 @@ await test.process({
             paymentsTotal: 6n,
             firstPaymentAt: BigInt(START),
           },
+        },
+        // The sender said who it is from and what it is for.
+        {
+          contract: "IrisCommitments",
+          event: "CommitmentNoted",
+          block: at(0),
+          transaction: tx(0),
+          params: { id: 1n, from: "Alice", about: "the flat" },
         },
         // Bob opens the link.
         {
@@ -134,12 +143,18 @@ console.log("\nA commitment opened for someone with no address yet");
 const first = await test.Commitment.getOrThrow("1");
 check("is attributed to whoever redeemed the link", first.recipient, BOB.toLowerCase());
 check("is marked claimed", first.claimed, true);
+check("carries who it is from", first.noteFrom, "Alice");
+check("and what it is for", first.noteAbout, "the flat");
 check("escrowed the whole schedule up front", first.totalCommitted, AUSD(300));
 check("counts what has actually been released", first.totalReleased, AUSD(100));
 check("tracks how many payments went out", first.paymentsMade, 2);
 check("carries the next due date forward", first.nextPaymentAt, BigInt(START + 2 * MONTH));
 check("is cancelled", first.cancelled, true);
 check("returned what was still unscheduled", first.refunded, AUSD(200));
+
+console.log("\nA commitment nobody wrote anything about");
+const unlabelled = await test.Commitment.getOrThrow("2");
+check("says nothing rather than something wrong", unlabelled.noteFrom, "");
 
 console.log("\nThe zero address is not a person");
 const nobody = await test.Account.get(NOBODY);
@@ -157,7 +172,7 @@ check("and how much moved", second?.amount, AUSD(50));
 console.log("\nRunning totals, which is what the app opens on");
 const alice = await test.Account.getOrThrow(ALICE.toLowerCase());
 check("Alice sent one commitment", alice.commitmentsSent, 1);
-check("her escrow is net of the refund", alice.totalEscrowed, AUSD(100));
+check("her total is net of the refund", alice.totalCommitted, AUSD(100));
 
 const bob = await test.Account.getOrThrow(BOB.toLowerCase());
 check("Bob is on the receiving end of two", bob.commitmentsReceived, 2);
@@ -165,7 +180,7 @@ check("counted once each, not twice for the claim", bob.commitmentsSent, 0);
 check("and has been paid what was released", bob.totalReceived, AUSD(100));
 
 const carol = await test.Account.getOrThrow(CAROL.toLowerCase());
-check("Carol's direct commitment is escrowed in full", carol.totalEscrowed, AUSD(30));
+check("Carol's direct commitment counts in full", carol.totalCommitted, AUSD(30));
 
 console.log(`\n${checks - failures}/${checks} checks passed`);
 if (failures > 0) process.exit(1);

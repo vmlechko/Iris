@@ -7,14 +7,14 @@ import { monadTestnet } from "viem/chains";
 import type { Address } from "viem";
 import { register, NoPrfError } from "@/lib/account";
 import { relay } from "@/lib/relay";
-import { getCommitment, cadenceLabel, money, remaining, IRIS, type Commitment } from "@/lib/iris";
+import { getCommitment, getNote, cadenceLabel, money, remaining, IRIS, type Commitment, type Note } from "@/lib/iris";
 import Steps from "@/app/components/Steps";
-import { readClaimFromHash, type ClaimLink } from "@/lib/link";
+import { readKeyFromHash, type ClaimLink } from "@/lib/link";
 
 type Phase =
   | { at: "reading" }
   | { at: "broken" }
-  | { at: "waiting"; link: ClaimLink; commitment: Commitment }
+  | { at: "waiting"; link: ClaimLink; commitment: Commitment; note?: Note }
   | { at: "receiving"; step: number }
   | { at: "received"; commitment: Commitment; address: Address }
   | { at: "failed"; message: string };
@@ -22,21 +22,27 @@ type Phase =
 /** What actually happens when a link is opened: a passkey, then a claim. */
 const RECEIVING = ["Creating your account", "Bringing the money in"] as const;
 
-export default function Claim() {
+export default function ClaimClient({ id }: { id: string }) {
   const [phase, setPhase] = useState<Phase>({ at: "reading" });
 
   useEffect(() => {
     // The key lives in the fragment, so it is read here and never sent
     // anywhere. A link without one is not a link.
-    const link = readClaimFromHash(location.hash);
+    const key = readKeyFromHash(location.hash);
+    const link: ClaimLink | undefined = key ? { id, key } : undefined;
     if (!link) {
       setPhase({ at: "broken" });
       return;
     }
     getCommitment(BigInt(link.id))
-      .then((commitment) => setPhase({ at: "waiting", link, commitment }))
+      .then(async (commitment) => {
+        // Who it is from matters more here than anywhere else: this is the
+        // screen where a stranger decides whether to trust a link.
+        const note = await getNote(BigInt(link.id)).catch(() => undefined);
+        setPhase({ at: "waiting", link, commitment, note });
+      })
       .catch(() => setPhase({ at: "broken" }));
-  }, []);
+  }, [id]);
 
   async function receive(link: ClaimLink, commitment: Commitment) {
     setPhase({ at: "receiving", step: 0 });
@@ -59,7 +65,7 @@ export default function Claim() {
     } catch (e) {
       const err = e as Error;
       if (err.name === "NotAllowedError") {
-        setPhase({ at: "waiting", link, commitment });
+        setPhase({ at: "waiting", link, commitment, note: phase.at === "waiting" ? phase.note : undefined });
         return;
       }
       setPhase({ at: "failed", message: err instanceof NoPrfError ? err.message : err.message });
@@ -150,7 +156,9 @@ export default function Claim() {
 
   return (
     <main className="wrap">
-      <p className="eyebrow">Waiting for you</p>
+      <p className="eyebrow">
+        {phase.note?.from?.trim() ? `From ${phase.note.from.trim()}` : "Waiting for you"}
+      </p>
       <h1>
         {money(c.amountPerPayment)} <em>now</em>.
       </h1>
@@ -159,6 +167,10 @@ export default function Claim() {
         {left - 1 === 1 ? "time" : "times"}. All {money(remaining(c))} of it is
         already set aside and waiting.
       </p>
+
+      {phase.note?.about?.trim() && (
+        <p className="lede">For {phase.note.about.trim()}.</p>
+      )}
 
       <div className="actions">
         <button onClick={() => receive(phase.link, phase.commitment)}>

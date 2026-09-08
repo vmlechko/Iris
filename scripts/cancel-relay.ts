@@ -69,14 +69,26 @@ async function main() {
   });
 
   const claimSigner = privateKeyToAccount(generatePrivateKey()).address;
+  const note = { from: "A test", about: "proving the relayed path" };
   const { salt, validBefore, signature: authSignature } = await authorizeCommitment(sender, {
-    claimSigner, amountPerPayment: amount, interval: 3600, paymentsTotal: payments, startNow: false,
+    claimSigner, amountPerPayment: amount, interval: 3600, paymentsTotal: payments, startNow: false, note,
   });
+
+  // The note is the field a recipient acts on — "from Mum" is why they trust
+  // the link at all. It is bound into the ERC-3009 nonce, so a relayer holding
+  // the signature cannot keep the schedule and rewrite who it is from.
+  const forged = await post({
+    action: "create", from: sender.address, claimSigner,
+    amountPerPayment: amount.toString(), interval: "3600", paymentsTotal: String(payments),
+    startNow: false, validBefore: validBefore.toString(), salt, signature: authSignature,
+    note: { from: "Someone else", about: note.about },
+  });
+  check("a rewritten note is refused", forged.status === 400, forged.body?.error ?? "IT WENT THROUGH");
 
   const created = await post({
     action: "create", from: sender.address, claimSigner,
     amountPerPayment: amount.toString(), interval: "3600", paymentsTotal: String(payments),
-    startNow: false, validBefore: validBefore.toString(), salt, signature: authSignature,
+    startNow: false, validBefore: validBefore.toString(), salt, signature: authSignature, note,
   }, "opening a commitment");
   check("the relayer opened the commitment", created.status === 200, JSON.stringify(created.body).slice(0, 120));
   if (created.status !== 200) process.exit(1);

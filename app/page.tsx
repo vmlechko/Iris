@@ -6,16 +6,17 @@ import type { Address } from "viem";
 import { register, restore, NoPrfError } from "@/lib/account";
 import { incomingOf, outgoingOf, money, remaining, whenNext, cadenceLabel, type Commitment } from "@/lib/iris";
 import Detail from "@/app/components/Detail";
+import { notesFor } from "@/lib/indexer";
 
 type State =
   | { at: "out" }
   | { at: "working" }
-  | { at: "in"; address: Address; incoming: Commitment[]; outgoing: Commitment[]; open: Commitment | null }
+  | { at: "in"; address: Address; incoming: Commitment[]; outgoing: Commitment[]; open: Commitment | null; names: Map<string, string> }
   | { at: "error"; message: string };
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
-function Row({ c, side, onOpen }: { c: Commitment; side: "in" | "out"; onOpen: () => void }) {
+function Row({ c, side, name, onOpen }: { c: Commitment; side: "in" | "out"; name?: string; onOpen: () => void }) {
   const done = c.paymentsMade >= c.paymentsTotal || c.cancelled;
   return (
     <li className={done ? "row done" : "row"}>
@@ -25,7 +26,7 @@ function Row({ c, side, onOpen }: { c: Commitment; side: "in" | "out"; onOpen: (
           <span className="muted">{cadenceLabel(c.interval)}</span>
           <span className="muted small block">
             {side === "in"
-              ? `from ${short(c.sender)}`
+              ? `from ${name ?? short(c.sender)}`
               : c.recipient === "0x0000000000000000000000000000000000000000"
                 ? "link not opened yet"
                 : `to ${short(c.recipient)}`}
@@ -52,7 +53,10 @@ export default function Home() {
       // is derived again, with a fresh prompt, whenever money moves.
       const address = await fn();
       const [incoming, outgoing] = await Promise.all([incomingOf(address), outgoingOf(address)]);
-      setState({ at: "in", address, incoming, outgoing, open: null });
+      // Names are a nicety: if the indexer is unreachable the list falls back
+      // to addresses rather than failing to open.
+      const names = (await notesFor(incoming.map((c) => c.id))) ?? new Map<string, string>();
+      setState({ at: "in", address, incoming, outgoing, open: null, names });
     } catch (e) {
       const err = e as Error;
       if (err.name === "NotAllowedError") {
@@ -66,7 +70,8 @@ export default function Home() {
   /** Re-read both sides from the chain, after something changed there. */
   const refresh = async (address: Address) => {
     const [incoming, outgoing] = await Promise.all([incomingOf(address), outgoingOf(address)]);
-    setState({ at: "in", address, incoming, outgoing, open: null });
+    const names = (await notesFor(incoming.map((c) => c.id))) ?? new Map<string, string>();
+    setState({ at: "in", address, incoming, outgoing, open: null, names });
   };
 
   if (state.at === "in" && state.open) {
@@ -111,7 +116,7 @@ export default function Home() {
             <h2>Coming to you</h2>
             <ul className="rows">
               {state.incoming.map((c) => (
-                <Row key={String(c.id)} c={c} side="in" onOpen={() => setState({ ...state, open: c })} />
+                <Row key={String(c.id)} c={c} side="in" name={state.names.get(String(c.id))} onOpen={() => setState({ ...state, open: c })} />
               ))}
             </ul>
           </section>

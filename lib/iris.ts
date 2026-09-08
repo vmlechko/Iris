@@ -4,7 +4,7 @@ import { irisAbi } from "./iris-abi";
 
 export const IRIS: Address =
   (process.env.NEXT_PUBLIC_IRIS_ADDRESS as Address) ??
-  "0x7ed55fed7346ef9b5d4a92771486dcbb1c7b6c14";
+  "0x9f7f068b3297c77490b9606063e0f827a2db9a48";
 
 export { irisAbi, AUSD, AUSD_DECIMALS };
 
@@ -89,6 +89,19 @@ export async function getCommitment(id: bigint): Promise<Commitment> {
     paymentsMade: Number(c.paymentsMade),
     cancelled: c.cancelled,
   };
+}
+
+/** What the sender said about a commitment. Both halves may be empty. */
+export type Note = { from: string; about: string };
+
+export async function getNote(id: bigint): Promise<Note> {
+  const note = (await publicClient.readContract({
+    address: IRIS,
+    abi: irisAbi,
+    functionName: "noteOf",
+    args: [id],
+  })) as Note;
+  return { from: note.from, about: note.about };
 }
 
 async function listFor(fn: "incomingOf" | "outgoingOf", who: Address) {

@@ -19,6 +19,11 @@ import {
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { monadTestnet } from "viem/chains";
 import { readFileSync } from "node:fs";
+import { noteHash } from "../lib/authorize";
+
+/** Nothing said. The scripts exercise the schedule, not the wording. */
+const NO_NOTE = { from: "", about: "" };
+
 
 const artifacts = JSON.parse(readFileSync("artifacts/contracts.json", "utf8"));
 const AUSD = "0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC" as Address;
@@ -71,7 +76,7 @@ async function main() {
 
   // The app creates gaslessly: the sender signs, a relayer submits.
   const salt = generatePrivateKey();
-  const nonce = await read(iris, I, "authorizationNonce", [salt, link.address, perPayment, 30, 3, true]);
+  const nonce = await read(iris, I, "authorizationNonce", [salt, link.address, perPayment, 30, 3, true, noteHash(NO_NOTE)]);
   const validBefore = BigInt(Math.floor(Date.now() / 1000) + 3600);
   const authorization = await sender.signTypedData({
     domain: { name: "Agora Dollar", version: "1", chainId: monadTestnet.id, verifyingContract: AUSD },
@@ -84,6 +89,7 @@ async function main() {
   });
   await send(iris, I, "createToClaimWithAuthorization", [
     sender.address, link.address, perPayment, 30, 3, true, 0n, validBefore, salt, authorization,
+    NO_NOTE,
   ]);
   const id = (await read(iris, I, "count")) - 1n;
   let c = await read(iris, I, "get", [id]);

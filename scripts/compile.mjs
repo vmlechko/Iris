@@ -33,4 +33,13 @@ for (const n of names) {
   built[n] = { abi: c.abi, bytecode: `0x${c.evm.bytecode.object}` };
 }
 writeFileSync("artifacts/contracts.json", JSON.stringify(built, null, 2));
+
+// The app's ABI is written from the same output rather than kept by hand. It
+// claimed to be generated for a while before it was, which is exactly how an
+// ABI drifts away from the contract it describes without anyone noticing.
+writeFileSync(
+  "lib/iris-abi.ts",
+  "// Generated from contracts/IrisCommitments.sol by `npm run compile`. Do not edit.\n" +
+    `export const irisAbi = ${JSON.stringify(built.IrisCommitments.abi, null, 2)} as const;\n`
+);
 console.log("compiled:", names.join(", "), `(solc ${solc.version()})`);

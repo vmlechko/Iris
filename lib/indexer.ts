@@ -39,6 +39,31 @@ async function query<T>(document: string, variables: Record<string, unknown>): P
   }
 }
 
+const NOTES = `
+  query Notes($ids: [String!]) {
+    Commitment(where: { id: { _in: $ids } }) {
+      id
+      noteFrom
+      noteAbout
+    }
+  }
+`;
+
+/**
+ * Who each commitment is from, for a whole list at once.
+ *
+ * The list itself is read from the chain, one call per commitment; asking the
+ * chain for the notes too would double that. This is one request for all of
+ * them, and if it fails the list simply shows addresses as it did before.
+ */
+export async function notesFor(ids: bigint[]): Promise<Map<string, string> | null> {
+  if (ids.length === 0) return new Map();
+  type Row = { id: string; noteFrom: string; noteAbout: string };
+  const data = await query<{ Commitment: Row[] }>(NOTES, { ids: ids.map(String) });
+  if (!data) return null;
+  return new Map(data.Commitment.filter((c) => c.noteFrom).map((c) => [c.id, c.noteFrom]));
+}
+
 const PAYMENTS = `
   query Payments($commitment: String!) {
     Payment(where: { commitment_id: { _eq: $commitment } }, order_by: { paymentNumber: asc }) {

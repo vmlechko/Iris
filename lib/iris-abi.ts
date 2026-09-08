@@ -1,4 +1,4 @@
-// Generated from contracts/IrisCommitments.sol by `npm run compile`.
+// Generated from contracts/IrisCommitments.sol by `npm run compile`. Do not edit.
 export const irisAbi = [
   {
     "inputs": [
@@ -49,6 +49,11 @@ export const irisAbi = [
   {
     "inputs": [],
     "name": "NotSender",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NoteTooLong",
     "type": "error"
   },
   {
@@ -169,6 +174,31 @@ export const irisAbi = [
         "type": "uint256"
       },
       {
+        "indexed": false,
+        "internalType": "string",
+        "name": "from",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "about",
+        "type": "string"
+      }
+    ],
+    "name": "CommitmentNoted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
         "indexed": true,
         "internalType": "address",
         "name": "recipient",
@@ -227,6 +257,11 @@ export const irisAbi = [
         "internalType": "bool",
         "name": "startNow",
         "type": "bool"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "note",
+        "type": "bytes32"
       }
     ],
     "name": "authorizationNonce",
@@ -315,6 +350,23 @@ export const irisAbi = [
         "internalType": "bool",
         "name": "startNow",
         "type": "bool"
+      },
+      {
+        "components": [
+          {
+            "internalType": "string",
+            "name": "from",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "about",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct IrisCommitments.Note",
+        "name": "note",
+        "type": "tuple"
       }
     ],
     "name": "create",
@@ -354,6 +406,23 @@ export const irisAbi = [
         "internalType": "bool",
         "name": "startNow",
         "type": "bool"
+      },
+      {
+        "components": [
+          {
+            "internalType": "string",
+            "name": "from",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "about",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct IrisCommitments.Note",
+        "name": "note",
+        "type": "tuple"
       }
     ],
     "name": "createToClaim",
@@ -418,6 +487,23 @@ export const irisAbi = [
         "internalType": "bytes",
         "name": "signature",
         "type": "bytes"
+      },
+      {
+        "components": [
+          {
+            "internalType": "string",
+            "name": "from",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "about",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct IrisCommitments.Note",
+        "name": "note",
+        "type": "tuple"
       }
     ],
     "name": "createToClaimWithAuthorization",
@@ -482,6 +568,23 @@ export const irisAbi = [
         "internalType": "bytes",
         "name": "signature",
         "type": "bytes"
+      },
+      {
+        "components": [
+          {
+            "internalType": "string",
+            "name": "from",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "about",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct IrisCommitments.Note",
+        "name": "note",
+        "type": "tuple"
       }
     ],
     "name": "createWithAuthorization",
@@ -617,6 +720,68 @@ export const irisAbi = [
         "internalType": "uint256[]",
         "name": "",
         "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "string",
+            "name": "from",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "about",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct IrisCommitments.Note",
+        "name": "note",
+        "type": "tuple"
+      }
+    ],
+    "name": "noteHash",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      }
+    ],
+    "name": "noteOf",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "string",
+            "name": "from",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "about",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct IrisCommitments.Note",
+        "name": "",
+        "type": "tuple"
       }
     ],
     "stateMutability": "view",
