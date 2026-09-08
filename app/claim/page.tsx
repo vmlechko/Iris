@@ -8,15 +8,19 @@ import type { Address } from "viem";
 import { register, NoPrfError } from "@/lib/account";
 import { relay } from "@/lib/relay";
 import { getCommitment, cadenceLabel, money, remaining, IRIS, type Commitment } from "@/lib/iris";
+import Steps from "@/app/components/Steps";
 import { readClaimFromHash, type ClaimLink } from "@/lib/link";
 
 type Phase =
   | { at: "reading" }
   | { at: "broken" }
   | { at: "waiting"; link: ClaimLink; commitment: Commitment }
-  | { at: "receiving" }
+  | { at: "receiving"; step: number }
   | { at: "received"; commitment: Commitment; address: Address }
   | { at: "failed"; message: string };
+
+/** What actually happens when a link is opened: a passkey, then a claim. */
+const RECEIVING = ["Creating your account", "Bringing the money in"] as const;
 
 export default function Claim() {
   const [phase, setPhase] = useState<Phase>({ at: "reading" });
@@ -35,10 +39,11 @@ export default function Claim() {
   }, []);
 
   async function receive(link: ClaimLink, commitment: Commitment) {
-    setPhase({ at: "receiving" });
+    setPhase({ at: "receiving", step: 0 });
     try {
       // One passkey ceremony. The address it derives is what the link binds to.
       const address = await register();
+      setPhase({ at: "receiving", step: 1 });
 
       // The link's key signs that address, so this claim cannot be redirected
       // even by whoever relays it.
@@ -119,7 +124,9 @@ export default function Claim() {
   if (phase.at === "receiving") {
     return (
       <main className="wrap">
-        <p className="lede">Receiving…</p>
+        <p className="eyebrow">Almost there</p>
+        <h1>Setting up.</h1>
+        <Steps steps={RECEIVING} current={phase.step} />
       </main>
     );
   }

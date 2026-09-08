@@ -33,11 +33,17 @@ function check(what: string, ok: boolean, detail = "") {
   console.log(`  ${ok ? "ok  " : "FAIL"}  ${what}${detail ? `  — ${detail}` : ""}`);
 }
 
-const post = async (body: unknown) => {
+/** Timed, because the interface promises the person a number of seconds. */
+const timings: { what: string; ms: number }[] = [];
+
+const post = async (body: unknown, label?: string) => {
+  const started = Date.now();
   const response = await fetch(`${base}/api/relay`, {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
   });
-  return { status: response.status, body: await response.json() };
+  const result = { status: response.status, body: await response.json() };
+  if (label && result.status === 200) timings.push({ what: label, ms: Date.now() - started });
+  return result;
 };
 
 const inner = (account: Address, to: Address, data: Hex, nonce: bigint) =>
@@ -71,7 +77,7 @@ async function main() {
     action: "create", from: sender.address, claimSigner,
     amountPerPayment: amount.toString(), interval: "3600", paymentsTotal: String(payments),
     startNow: false, validBefore: validBefore.toString(), salt, signature: authSignature,
-  });
+  }, "opening a commitment");
   check("the relayer opened the commitment", created.status === 200, JSON.stringify(created.body).slice(0, 120));
   if (created.status !== 200) process.exit(1);
 
@@ -95,7 +101,7 @@ async function main() {
   const stopped = await post({
     action: "cancel", from: sender.address, id: id.toString(), nonce: "0",
     signature: senderSignature, authorization: auth,
-  });
+  }, "stopping one");
   check("the sender's cancellation goes through", stopped.status === 200,
     stopped.body?.error ?? stopped.body?.hash ?? "");
 
@@ -113,6 +119,9 @@ async function main() {
     signature: senderSignature, authorization: auth,
   });
   check("cancelling twice is refused", again.status === 400, again.body?.error ?? "");
+
+  console.log("\nHow long the person actually waits");
+  for (const t of timings) console.log(`  ${t.what.padEnd(24)} ${(t.ms / 1000).toFixed(1)}s`);
 
   console.log(`\n${checks - failures}/${checks} checks passed`);
   if (failures > 0) process.exit(1);

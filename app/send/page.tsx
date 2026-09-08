@@ -11,14 +11,20 @@ import { publicClient, AUSD } from "@/lib/chain";
 import { CADENCES, IRIS, irisAbi, fromAusd, money } from "@/lib/iris";
 import type { Address } from "viem";
 import { addressOfKey, buildClaimUrl } from "@/lib/link";
+import Steps from "@/app/components/Steps";
 
 type Done = { url: string; hash: string };
+
+/** The real sequence, named. The middle one covers a top-up when one is needed. */
+const SENDING = ["Approving with Face ID", "Setting the money aside", "Making the link"] as const;
 
 export default function Send() {
   const [amount, setAmount] = useState("200");
   const [cadence, setCadence] = useState<number>(CADENCES[1].seconds);
   const [count, setCount] = useState(6);
   const [busy, setBusy] = useState(false);
+  /** Which named step the person is watching. -1 while nothing is running. */
+  const [step, setStep] = useState(-1);
   const [error, setError] = useState("");
   const [done, setDone] = useState<Done | undefined>();
   /**
@@ -56,6 +62,7 @@ export default function Send() {
 
   async function create() {
     setBusy(true);
+    setStep(0);
     setError("");
     try {
       // The link's key never touches the network. It is generated here, its
@@ -72,6 +79,7 @@ export default function Send() {
       };
 
       const { hash } = await withSigner(async (account) => {
+        setStep(1);
         await ensureFunds(account.address, per * BigInt(count));
         const auth = await authorizeCommitment(account, schedule);
         return relay({
@@ -88,6 +96,7 @@ export default function Send() {
         });
       });
 
+      setStep(2);
       const id =
         ((await publicClient.readContract({
           address: IRIS,
@@ -100,6 +109,7 @@ export default function Send() {
       setError((e as Error).message);
     } finally {
       setBusy(false);
+      setStep(-1);
     }
   }
 
@@ -196,8 +206,9 @@ export default function Send() {
           onClick={create}
           disabled={!valid || busy}
         >
-          {busy ? "Confirming…" : "Set it aside with Face ID"}
+          {busy ? "Setting it aside…" : "Set it aside with Face ID"}
         </button>
+        {busy && <Steps steps={SENDING} current={step} />}
       </div>
 
       <Link className="quiet" href="/">

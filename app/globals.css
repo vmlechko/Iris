@@ -293,6 +293,88 @@ button.danger {
 
 .details .address { margin-top: 0.6rem; }
 
+/* --- waiting ----------------------------------------------------------- */
+
+/* A rail of checkpoints. The line between them fills as they are passed, so
+   the screen reads as moving even when each step is under two seconds. */
+
+.steps {
+  list-style: none;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  position: relative;
+  font-size: 0.95rem;
+  color: var(--muted);
+  transition: color 0.25s ease;
+}
+
+/* The connector, drawn from each dot up to the one before it. */
+.step + .step::before {
+  content: "";
+  position: absolute;
+  left: 0.3125rem;
+  bottom: 50%;
+  height: 100%;
+  width: 1px;
+  background: var(--line);
+}
+
+.step.done + .step::before,
+.step.now::before {
+  background: var(--accent);
+}
+
+.dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  flex: none;
+  position: relative;
+  z-index: 1;
+  background: var(--bg);
+  transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+/* Passed steps are softened, so the live one is the only thing at full
+   strength and the eye lands on it without hunting. */
+.step.done .dot {
+  background: color-mix(in oklab, var(--accent) 40%, transparent);
+  border-color: transparent;
+}
+
+.step.done { color: var(--muted); }
+
+.step.now {
+  color: var(--fg);
+}
+
+.step.now .dot {
+  border-color: var(--accent);
+  background: var(--accent);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 45%, transparent); }
+  50% { box-shadow: 0 0 0 0.35rem color-mix(in oklab, var(--accent) 0%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step.now .dot { animation: none; }
+  .step { transition: none; }
+}
+
 /* --- the sentence ------------------------------------------------------ */
 
 /* Rather than a form, the commitment reads as a line of prose with the

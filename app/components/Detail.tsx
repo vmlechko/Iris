@@ -18,6 +18,7 @@ import { explorerTx } from "@/lib/chain";
 import { withSigner } from "@/lib/account";
 import { cancelCommitment } from "@/lib/delegate";
 import { paymentsFor, type Payment } from "@/lib/indexer";
+import Steps from "@/app/components/Steps";
 import { money, cadenceLabel, whenNext, remaining, type Commitment } from "@/lib/iris";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -28,10 +29,13 @@ const day = (seconds: number) =>
     day: "numeric", month: "short", year: "numeric",
   });
 
+/** Approving, then the sponsored transaction that does it. */
+const STOPPING = ["Approving with Face ID", "Stopping the payments"] as const;
+
 type Stopping =
   | { at: "idle" }
   | { at: "confirming" }
-  | { at: "working" }
+  | { at: "working"; step: number }
   | { at: "stopped"; hash: string }
   | { at: "failed"; message: string };
 
@@ -60,9 +64,12 @@ export default function Detail({
   const canStop = mine && !commitment.cancelled && !finished;
 
   const stop = async () => {
-    setStopping({ at: "working" });
+    setStopping({ at: "working", step: 0 });
     try {
-      const { hash } = await withSigner((account) => cancelCommitment(account, commitment.id));
+      const { hash } = await withSigner((account) => {
+        setStopping({ at: "working", step: 1 });
+        return cancelCommitment(account, commitment.id);
+      });
       setStopping({ at: "stopped", hash });
       onChanged();
     } catch (e) {
@@ -150,7 +157,12 @@ export default function Detail({
             </>
           )}
 
-          {stopping.at === "working" && <button disabled>Stopping…</button>}
+          {stopping.at === "working" && (
+            <>
+              <button disabled>Stopping…</button>
+              <Steps steps={STOPPING} current={stopping.step} />
+            </>
+          )}
         </div>
       )}
 
