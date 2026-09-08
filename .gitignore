@@ -14,3 +14,6 @@ public/sw.js
 public/sw.js.map
 cre/workflow/node_modules/
 cre/**/.cre_build_tmp.js
+indexer/.envio/
+indexer/generated/
+indexer/envio-env.d.ts

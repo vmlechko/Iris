@@ -1,0 +1,34 @@
+# Iris — recurring cross-border commitments on Monad testnet.
+#
+# The app needs to answer two questions the chain cannot answer directly:
+# what has this address committed, and what has it received. Both live in
+# events, and the public RPC caps eth_getLogs at a 100-block window, so
+# reading them back without an index is not practical.
+
+name: iris
+description: Recurring AUSD commitments — schedules, claims, releases and cancellations.
+
+contracts:
+  - name: IrisCommitments
+    handler: src/handlers.ts
+    events:
+      - event: "CommitmentCreated(uint256 indexed id, address indexed sender, address indexed recipient, uint128 amountPerPayment, uint40 interval, uint16 paymentsTotal, uint40 firstPaymentAt)"
+      - event: "CommitmentClaimed(uint256 indexed id, address indexed recipient)"
+      - event: "PaymentReleased(uint256 indexed id, address indexed recipient, uint128 amount, uint16 paymentsMade, uint40 nextPaymentAt)"
+      - event: "CommitmentCancelled(uint256 indexed id, address indexed sender, uint256 refunded)"
+
+chains:
+  - id: 10143
+    # The deployment block was never recorded, and the public RPC prunes state
+    # so it cannot be recovered with eth_getCode. This is the first block of
+    # 4 September 2026, comfortably before the contract existed.
+    # See scripts/start-block.mjs in the repository root.
+    start_block: 59479001
+    contracts:
+      - name: IrisCommitments
+        address:
+          - "0x7ed55fed7346ef9b5d4a92771486dcbb1c7b6c14"
+
+field_selection:
+  transaction_fields:
+    - hash

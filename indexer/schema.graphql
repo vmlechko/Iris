@@ -1,0 +1,69 @@
+"""
+A promise with the money already behind it.
+
+The whole schedule is escrowed when the commitment is created, so everything
+here is knowable in advance: how much, how often, how many times, and what has
+been paid out so far.
+"""
+type Commitment {
+  "The commitment's index in the contract, as a decimal string."
+  id: ID!
+
+  sender: String!
+
+  """
+  Empty until a claim link is redeemed. A commitment can be opened for someone
+  who has no address yet, so the recipient is not known at creation time.
+  """
+  recipient: String
+
+  amountPerPayment: BigInt!
+  interval: Int!
+  paymentsTotal: Int!
+  paymentsMade: Int!
+
+  "amountPerPayment × paymentsTotal — what was escrowed up front."
+  totalCommitted: BigInt!
+  totalReleased: BigInt!
+
+  "What returned to the sender on cancellation. Zero while the commitment lives."
+  refunded: BigInt!
+
+  firstPaymentAt: BigInt!
+  nextPaymentAt: BigInt!
+
+  cancelled: Boolean!
+  claimed: Boolean!
+
+  createdAt: BigInt!
+  createdTx: String!
+
+  payments: [Payment!]! @derivedFrom(field: "commitment")
+}
+
+"A single release. Anyone may push one once it is due, so this records who did."
+type Payment {
+  "Commitment id and payment number, e.g. \"7-3\"."
+  id: ID!
+  commitment: Commitment!
+  recipient: String!
+  amount: BigInt!
+  paymentNumber: Int!
+  releasedAt: BigInt!
+  txHash: String!
+}
+
+"""
+Everything one address is party to, on both sides.
+
+Kept as a running total rather than computed on read: the app opens on this,
+and a passkey account arrives with no local history to fall back on.
+"""
+type Account {
+  "The address, lowercased."
+  id: ID!
+  commitmentsSent: Int!
+  commitmentsReceived: Int!
+  totalEscrowed: BigInt!
+  totalReceived: BigInt!
+}
