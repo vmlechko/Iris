@@ -46,11 +46,13 @@ export async function generateMetadata(
       ? `For ${note.about.trim()}. The first payment arrives when you open this — no app, no wallet, no account.`
       : "The first payment arrives when you open this — no app, no wallet, no account.";
 
+    // Absolute, or the layout's "%s · Iris" template lands in the middle of a
+    // chat card. The app's name belongs in og:site_name, which the layout sets.
     return {
       title,
       description,
-      openGraph: { title, description, type: "website" },
-      twitter: { card: "summary_large_image", title, description },
+      openGraph: { title: { absolute: title }, description, type: "website" },
+      twitter: { card: "summary_large_image", title: { absolute: title }, description },
     };
   } catch {
     return fallback;
