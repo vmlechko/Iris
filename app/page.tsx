@@ -88,7 +88,16 @@ export default function Home() {
           <p className="eyebrow">Your account</p>
           <button className="linkish" onClick={() => setState({ at: "out" })}>Sign out</button>
         </header>
-        <p className="address">{state.address}</p>
+        {/* Nobody in Iris ever types an address at another person — a claim
+            link carries the whole thing. So the address does no work on this
+            screen, and thirty-eight hex characters are the loudest possible
+            way to say "this is crypto". It stays available for anyone who
+            wants to check which account they are in, and out of the way of
+            everyone who does not. */}
+        <details className="details">
+          <summary>Account details</summary>
+          <p className="address">{state.address}</p>
+        </details>
 
         {nothing && (
           <p className="lede">

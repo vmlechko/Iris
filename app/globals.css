@@ -269,6 +269,30 @@ button.danger {
   color: #fff;
 }
 
+/* Quiet enough that it does not read as part of the screen's business. */
+
+.details summary {
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  list-style: none;
+  width: fit-content;
+}
+
+.details summary::-webkit-details-marker { display: none; }
+
+.details summary::after {
+  content: " ›";
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.details[open] summary::after { transform: rotate(90deg); }
+
+.details summary:hover { color: var(--fg); }
+
+.details .address { margin-top: 0.6rem; }
+
 /* --- the sentence ------------------------------------------------------ */
 
 /* Rather than a form, the commitment reads as a line of prose with the

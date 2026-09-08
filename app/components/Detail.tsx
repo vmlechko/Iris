@@ -107,7 +107,7 @@ export default function Detail({
       <h2>Already paid</h2>
       {history === "loading" && <p className="note">Looking…</p>}
       {history === null && (
-        <p className="note">The history is unavailable right now. Everything above is read from the chain.</p>
+        <p className="note">The history is unavailable right now. Everything above is current.</p>
       )}
       {Array.isArray(history) && history.length === 0 && (
         <p className="note">Nothing has been released yet.</p>
@@ -157,7 +157,7 @@ export default function Detail({
       {stopping.at === "stopped" && (
         <p className="note">
           Stopped.{" "}
-          <a href={explorerTx(stopping.hash)} target="_blank" rel="noreferrer">See it on chain</a>.
+          <a href={explorerTx(stopping.hash)} target="_blank" rel="noreferrer">See the receipt</a>.
         </p>
       )}
       {stopping.at === "failed" && <p className="error">{stopping.message}</p>}

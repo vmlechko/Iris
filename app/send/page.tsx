@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { generatePrivateKey } from "viem/accounts";
 import type { Hex } from "viem";
-import { restore, withSigner } from "@/lib/account";
+import { withSigner } from "@/lib/account";
 import { authorizeCommitment } from "@/lib/authorize";
 import { relay } from "@/lib/relay";
-import { publicClient, AUSD, AUSD_DECIMALS } from "@/lib/chain";
+import { publicClient, AUSD } from "@/lib/chain";
 import { CADENCES, IRIS, irisAbi, fromAusd, money } from "@/lib/iris";
-import { formatUnits, type Address } from "viem";
+import type { Address } from "viem";
 import { addressOfKey, buildClaimUrl } from "@/lib/link";
 
 type Done = { url: string; hash: string };
@@ -21,48 +21,27 @@ export default function Send() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState<Done | undefined>();
-  const [balance, setBalance] = useState<bigint | undefined>();
-  const [address, setAddress] = useState<Address | undefined>();
+  /**
+   * Make sure there is enough to set aside, without saying so.
+   *
+   * On a testnet the balance is a stage prop, and asking someone to visit a
+   * faucet before they can send money is the loudest crypto tell there is. So
+   * this happens inside the one action the person actually asked for. On
+   * mainnet it simply would not exist: the money would be theirs already.
+   */
+  async function ensureFunds(who: Address, needed: bigint) {
+    const read = () =>
+      publicClient.readContract({
+        address: AUSD,
+        abi: [{ type: "function", name: "balanceOf", stateMutability: "view",
+                inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] }],
+        functionName: "balanceOf",
+        args: [who],
+      }) as Promise<bigint>;
 
-  // Reading a balance needs no key, so the address is derived once and the
-  // signing session is closed before this resolves.
-  useEffect(() => {
-    restore()
-      .then(async (a) => {
-        setAddress(a);
-        setBalance(
-          (await publicClient.readContract({
-            address: AUSD,
-            abi: [{ type: "function", name: "balanceOf", stateMutability: "view",
-                    inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] }],
-            functionName: "balanceOf",
-            args: [a],
-          })) as bigint
-        );
-      })
-      .catch(() => {});
-  }, []);
-
-  async function topUp() {
-    if (!address) return;
-    setBusy(true);
-    setError("");
-    try {
-      await relay({ action: "fund", to: address });
-      setBalance(
-        (await publicClient.readContract({
-          address: AUSD,
-          abi: [{ type: "function", name: "balanceOf", stateMutability: "view",
-                  inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] }],
-          functionName: "balanceOf",
-          args: [address],
-        })) as bigint
-      );
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    if ((await read()) >= needed) return;
+    await relay({ action: "fund", to: who });
+    await read();
   }
 
   const per = useMemo(() => {
@@ -93,6 +72,7 @@ export default function Send() {
       };
 
       const { hash } = await withSigner(async (account) => {
+        await ensureFunds(account.address, per * BigInt(count));
         const auth = await authorizeCommitment(account, schedule);
         return relay({
           action: "create",
@@ -211,21 +191,10 @@ export default function Send() {
         now, so every payment after it is already paid for.
       </p>
 
-      {balance !== undefined && balance < total && (
-        <p className="note">
-          You hold {formatUnits(balance, AUSD_DECIMALS)} AUSD and this needs{" "}
-          {money(total)}.{" "}
-          <button className="linkish" onClick={topUp} disabled={busy}>
-            Get test AUSD
-          </button>{" "}
-          — this is a testnet, so none of it is real money.
-        </p>
-      )}
-
       <div className="actions">
         <button
           onClick={create}
-          disabled={!valid || busy || (balance !== undefined && balance < total)}
+          disabled={!valid || busy}
         >
           {busy ? "Confirming…" : "Set it aside with Face ID"}
         </button>
