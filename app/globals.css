@@ -269,6 +269,16 @@ button.danger {
   color: #fff;
 }
 
+/* The balance leads, because it is the first thing anyone wants from an
+   account. Large enough to be the answer, quiet enough not to be a headline. */
+.balance {
+  font-size: clamp(1.75rem, 7vw, 2.25rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  font-weight: 500;
+  margin: 0;
+}
+
 /* Quiet enough that it does not read as part of the screen's business. */
 
 .details summary {

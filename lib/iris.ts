@@ -91,6 +91,23 @@ export async function getCommitment(id: bigint): Promise<Commitment> {
   };
 }
 
+/**
+ * What the account holds, in AUSD.
+ *
+ * Not a wallet balance in the crypto sense — the person never sees a token
+ * name — but the answer to "how much do I have", which any account owes its
+ * owner and which the Agora bounty asks for by name.
+ */
+export async function balanceOf(who: Address): Promise<bigint> {
+  return (await publicClient.readContract({
+    address: AUSD,
+    abi: [{ type: "function", name: "balanceOf", stateMutability: "view",
+            inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] }],
+    functionName: "balanceOf",
+    args: [who],
+  })) as bigint;
+}
+
 /** What the sender said about a commitment. Both halves may be empty. */
 export type Note = { from: string; about: string };
 

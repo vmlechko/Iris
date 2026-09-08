@@ -52,9 +52,14 @@ back without PRF — the account would not be recoverable. Chrome asking you for
 six-digit PIN is the sign it is about to do that.
 
 There is nothing else to set up. No wallet, no extension, no seed phrase, no test
-tokens to go and fetch: the demo tops itself up behind the scenes, because
-sending someone to a faucet in the middle of a payment is the one thing this
-project is arguing against.
+tokens to go and fetch: on testnet the sending account tops itself up behind the
+scenes, because sending someone to a faucet in the middle of a payment is the one
+thing this project is arguing against. In a real deployment that money would
+already be the sender's; Iris does not build an on-ramp.
+
+The person receiving needs nothing at all — not gas, not a balance, not an
+account. A claim link is not a request for payment: the money is already
+escrowed before the link is sent.
 
 To see the whole thing:
 
@@ -366,6 +371,11 @@ deployment its own key rather than a development one, keep the balance small,
 and move the throttle into a durable store before this ever touches real money.
 
 ## The screens
+
+**The account.** What you hold, then what is coming and what you are sending.
+The balance leads because it is the first thing anyone wants from an account —
+and because the only place it used to appear was as a reason the sending screen
+would not let you continue.
 
 **Sending.** Amount, cadence, how many times. The line underneath says what
 lands today and what is set aside in total, because the number that matters to

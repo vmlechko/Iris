@@ -4,14 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import type { Address } from "viem";
 import { register, restore, NoPrfError } from "@/lib/account";
-import { incomingOf, outgoingOf, money, remaining, whenNext, cadenceLabel, type Commitment } from "@/lib/iris";
+import { incomingOf, outgoingOf, balanceOf, money, remaining, whenNext, cadenceLabel, type Commitment } from "@/lib/iris";
 import Detail from "@/app/components/Detail";
 import { notesFor } from "@/lib/indexer";
 
 type State =
   | { at: "out" }
   | { at: "working" }
-  | { at: "in"; address: Address; incoming: Commitment[]; outgoing: Commitment[]; open: Commitment | null; names: Map<string, string> }
+  | { at: "in"; address: Address; incoming: Commitment[]; outgoing: Commitment[]; open: Commitment | null; names: Map<string, string>; held: bigint }
   | { at: "error"; message: string };
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -52,11 +52,13 @@ export default function Home() {
       // Only the address is kept. The key was zeroed before this resolved and
       // is derived again, with a fresh prompt, whenever money moves.
       const address = await fn();
-      const [incoming, outgoing] = await Promise.all([incomingOf(address), outgoingOf(address)]);
+      const [incoming, outgoing, held] = await Promise.all([
+        incomingOf(address), outgoingOf(address), balanceOf(address),
+      ]);
       // Names are a nicety: if the indexer is unreachable the list falls back
       // to addresses rather than failing to open.
       const names = (await notesFor(incoming.map((c) => c.id))) ?? new Map<string, string>();
-      setState({ at: "in", address, incoming, outgoing, open: null, names });
+      setState({ at: "in", address, incoming, outgoing, open: null, names, held });
     } catch (e) {
       const err = e as Error;
       if (err.name === "NotAllowedError") {
@@ -69,9 +71,11 @@ export default function Home() {
 
   /** Re-read both sides from the chain, after something changed there. */
   const refresh = async (address: Address) => {
-    const [incoming, outgoing] = await Promise.all([incomingOf(address), outgoingOf(address)]);
+    const [incoming, outgoing, held] = await Promise.all([
+      incomingOf(address), outgoingOf(address), balanceOf(address),
+    ]);
     const names = (await notesFor(incoming.map((c) => c.id))) ?? new Map<string, string>();
-    setState({ at: "in", address, incoming, outgoing, open: null, names });
+    setState({ at: "in", address, incoming, outgoing, open: null, names, held });
   };
 
   if (state.at === "in" && state.open) {
@@ -93,6 +97,11 @@ export default function Home() {
           <p className="eyebrow">Your account</p>
           <button className="linkish" onClick={() => setState({ at: "out" })}>Sign out</button>
         </header>
+        {/* The answer to "how much do I have", which any account owes its
+            owner — and which the sending screen used to give only as a reason
+            it would not let you continue. */}
+        <p className="balance">{money(state.held)}</p>
+
         {/* Nobody in Iris ever types an address at another person — a claim
             link carries the whole thing. So the address does no work on this
             screen, and thirty-eight hex characters are the loudest possible
