@@ -1,12 +1,12 @@
 {
-  "schedule": "0 0 * * * *",
+  "schedule": "0 * * * * *",
   "rateUrl": "https://open.er-api.com/v6/latest/USD",
   "quoteCurrency": "NGN",
   "evms": [
     {
       "chainSelectorName": "monad-testnet",
       "irisAddress": "0x7ed55fed7346ef9b5d4a92771486dcbb1c7b6c14",
-      "schedulerAddress": "0xd035ad453f188e54688601efc2865ee5af1196cf",
+      "schedulerAddress": "0x9d1e5e57dda0f1a0e48e596982858cbc7a8e8e78",
       "scanLimit": 200,
       "gasLimit": "1000000"
     }
