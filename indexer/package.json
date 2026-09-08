@@ -10,7 +10,7 @@
     "test": "tsx test/replay.ts"
   },
   "dependencies": {
-    "envio": "*"
+    "envio": "3.9.0"
   },
   "devDependencies": {
     "@types/node": "^26.5.0",
