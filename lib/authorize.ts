@@ -12,9 +12,9 @@ import { IRIS, irisAbi } from "./iris";
 import { monadTestnet } from "viem/chains";
 
 /** AUSD calls itself "Agora Dollar" in its EIP-712 domain, not "AUSD". */
-const DOMAIN = { name: "Agora Dollar", version: "1" } as const;
+export const DOMAIN = { name: "Agora Dollar", version: "1" } as const;
 
-const TYPES = {
+export const TYPES = {
   ReceiveWithAuthorization: [
     { name: "from", type: "address" },
     { name: "to", type: "address" },

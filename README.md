@@ -365,10 +365,31 @@ was created on, so moving to a different address orphans every account made at
 the old one. Pick the URL once.
 
 **The relayer is a hot wallet.** Anything the server can sign, the internet can
-ask it to sign, and the throttle in `app/api/relay/route.ts` lives in process
-memory — on a serverless host that is close to no throttle at all. Give the
-deployment its own key rather than a development one, keep the balance small,
-and move the throttle into a durable store before this ever touches real money.
+ask it to sign. The signatures stop anyone redirecting money, but they do not
+protect the relayer's own gas — and the throttle in `app/api/relay/route.ts`
+lives in process memory, which on a serverless host is close to no throttle at
+all. So the defences that matter read the chain instead of memory:
+
+- **Nothing costs gas until it is shown to succeed.** Claims and creations are
+  simulated. A cancellation is simulated as the full type-4 call, because a
+  forged signature passes every cheap check — any commitment's sender is public
+  — and would otherwise fail inside the delegate after the relayer had paid.
+- **There is no request for funds on its own.** An earlier version took a bare
+  address and called the faucet for it, which a loop could run forever. Topping
+  up now happens only inside a creation, after its ERC-3009 signature has been
+  recovered off chain and matched to the sender.
+- **The last of the gas is kept back.** Below a reserve the relayer stops topping
+  anyone up; below a floor it stops entirely rather than fail halfway through
+  somebody's claim.
+
+`scripts/cancel-relay.ts` tries each of these — a bare funding request, a
+creation signed by the wrong key, a cancellation with a forged signature — and
+checks the relayer's transaction count did not move.
+
+What this does not do is stop a determined attacker with a script and fresh keys
+from spending the relayer down to its reserve. That needs a durable rate limit,
+which needs a store. Give the deployment its own key, keep its balance small,
+and add one before this touches real money.
 
 ## The screens
 

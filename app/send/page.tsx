@@ -7,9 +7,8 @@ import type { Hex } from "viem";
 import { withSigner } from "@/lib/account";
 import { authorizeCommitment } from "@/lib/authorize";
 import { relay } from "@/lib/relay";
-import { publicClient, AUSD } from "@/lib/chain";
+import { publicClient } from "@/lib/chain";
 import { CADENCES, IRIS, irisAbi, fromAusd, money } from "@/lib/iris";
-import type { Address } from "viem";
 import { addressOfKey, buildClaimUrl } from "@/lib/link";
 import Steps from "@/app/components/Steps";
 
@@ -31,28 +30,6 @@ export default function Send() {
   const [step, setStep] = useState(-1);
   const [error, setError] = useState("");
   const [done, setDone] = useState<Done | undefined>();
-  /**
-   * Make sure there is enough to set aside, without saying so.
-   *
-   * On a testnet the balance is a stage prop, and asking someone to visit a
-   * faucet before they can send money is the loudest crypto tell there is. So
-   * this happens inside the one action the person actually asked for. On
-   * mainnet it simply would not exist: the money would be theirs already.
-   */
-  async function ensureFunds(who: Address, needed: bigint) {
-    const read = () =>
-      publicClient.readContract({
-        address: AUSD,
-        abi: [{ type: "function", name: "balanceOf", stateMutability: "view",
-                inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] }],
-        functionName: "balanceOf",
-        args: [who],
-      }) as Promise<bigint>;
-
-    if ((await read()) >= needed) return;
-    await relay({ action: "fund", to: who });
-    await read();
-  }
 
   const per = useMemo(() => {
     try {
@@ -86,7 +63,9 @@ export default function Send() {
 
       const { hash } = await withSigner(async (account) => {
         setStep(1);
-        await ensureFunds(account.address, per * BigInt(count));
+        // Topping the account up on testnet happens on the server, inside the
+        // creation and behind its signature — there is no separate request for
+        // funds that a loop could hammer.
         const auth = await authorizeCommitment(account, schedule);
         return relay({
           action: "create",

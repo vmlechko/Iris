@@ -85,6 +85,29 @@ async function main() {
   });
   check("a rewritten note is refused", forged.status === 400, forged.body?.error ?? "IT WENT THROUGH");
 
+  console.log("\nWhat the relayer will not pay for");
+  const spentBefore = await pub.getTransactionCount({ address: sponsor.address });
+
+  // It used to take a bare address and call the faucet for it — a curl loop
+  // could burn the relayer's gas at will.
+  const bareFunding = await post({ action: "fund", to: sender.address });
+  check("there is no way to ask for funds on their own", bareFunding.status === 400, bareFunding.body?.error ?? "");
+
+  // A real sender's address, signed by a stranger's key.
+  const stranger = privateKeyToAccount(generatePrivateKey());
+  const strangerAuth = await authorizeCommitment(stranger, {
+    claimSigner, amountPerPayment: amount, interval: 3600, paymentsTotal: payments, startNow: false, note,
+  });
+  const unsigned = await post({
+    action: "create", from: sender.address, claimSigner,
+    amountPerPayment: amount.toString(), interval: "3600", paymentsTotal: String(payments),
+    startNow: false, validBefore: strangerAuth.validBefore.toString(), salt: strangerAuth.salt,
+    signature: strangerAuth.signature, note,
+  });
+  check("a creation signed by someone else is refused", unsigned.status === 400, unsigned.body?.error ?? "");
+  check("and none of that cost the relayer a transaction",
+    (await pub.getTransactionCount({ address: sponsor.address })) === spentBefore);
+
   const created = await post({
     action: "create", from: sender.address, claimSigner,
     amountPerPayment: amount.toString(), interval: "3600", paymentsTotal: String(payments),
@@ -110,6 +133,20 @@ async function main() {
   check("a cancellation claimed by the wrong address is refused", impostor.status === 400,
     impostor.body?.error ?? "");
 
+  // The right sender and a real commitment, but someone else's signature:
+  // everything the relayer can check without the chain says yes. Reusing the
+  // sender's own 7702 authorization is the worst case — an observer could.
+  const forgedSignature = await privateKeyToAccount(generatePrivateKey())
+    .signMessage({ message: { raw: inner(sender.address, IRIS, data, 0n) } });
+  const beforeForgery = await pub.getTransactionCount({ address: sponsor.address });
+  const forgedStop = await post({
+    action: "cancel", from: sender.address, id: id.toString(), nonce: "0",
+    signature: forgedSignature, authorization: auth,
+  });
+  check("a cancellation with a forged signature is refused", forgedStop.status === 400, forgedStop.body?.error ?? "");
+  check("and the relayer paid nothing for the attempt",
+    (await pub.getTransactionCount({ address: sponsor.address })) === beforeForgery);
+
   const stopped = await post({
     action: "cancel", from: sender.address, id: id.toString(), nonce: "0",
     signature: senderSignature, authorization: auth,
@@ -131,6 +168,26 @@ async function main() {
     signature: senderSignature, authorization: auth,
   });
   check("cancelling twice is refused", again.status === 400, again.body?.error ?? "");
+
+  console.log("\nTopping up, now that only a real signature can ask for it");
+  // A sender holding nothing at all. The app no longer fetches funds itself;
+  // the relayer supplies them inside the creation, behind the signature.
+  const empty = privateKeyToAccount(generatePrivateKey());
+  const emptyNote = { from: "Nobody yet", about: "a first commitment" };
+  const emptySchedule = {
+    claimSigner: privateKeyToAccount(generatePrivateKey()).address,
+    amountPerPayment: amount, interval: 3600, paymentsTotal: payments, startNow: true, note: emptyNote,
+  };
+  const emptyAuth = await authorizeCommitment(empty, emptySchedule);
+  const fromNothing = await post({
+    action: "create", from: empty.address, claimSigner: emptySchedule.claimSigner,
+    amountPerPayment: amount.toString(), interval: "3600", paymentsTotal: String(payments),
+    startNow: true, validBefore: emptyAuth.validBefore.toString(), salt: emptyAuth.salt,
+    signature: emptyAuth.signature, note: emptyNote,
+  }, "opening from an empty account");
+  check("an account holding nothing can still open a commitment", fromNothing.status === 200,
+    fromNothing.body?.error ?? "");
+  check("and it never held gas", (await pub.getBalance({ address: empty.address })) === 0n);
 
   console.log("\nHow long the person actually waits");
   for (const t of timings) console.log(`  ${t.what.padEnd(24)} ${(t.ms / 1000).toFixed(1)}s`);

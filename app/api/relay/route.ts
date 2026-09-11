@@ -1,5 +1,5 @@
 /**
- * The relayer. Four actions, no more.
+ * The relayer. Three actions, no more.
  *
  * Both halves of Iris work from an empty account: the person receiving arrives
  * through a passkey holding nothing, and the person sending signs rather than
@@ -15,13 +15,36 @@
  * inside the ERC-3009 nonce; a cancellation carries the target and the calldata
  * inside the digest IrisDelegate checks. Even a relayer acting in bad faith
  * cannot point any of them somewhere else.
+ *
+ * What the signatures do not protect is the relayer's own gas. The throttle
+ * below lives in process memory, and on a serverless host each instance keeps
+ * its own, so it slows a casual caller and nothing more. The defences that
+ * hold across instances are the ones that read the chain instead:
+ *
+ * - Nothing costs gas until it has been shown to succeed. Calls are simulated,
+ *   and a creation's ERC-3009 signature is checked off chain before the
+ *   relayer so much as tops the sender up.
+ * - There is no way to ask for test funds on their own. Topping up happens
+ *   only inside a creation that carries a genuine signature, so it cannot be
+ *   driven by a loop of bare addresses.
+ * - Below a reserve the relayer stops topping anyone up, and below a floor it
+ *   stops altogether, so whatever someone burns, the last of the gas is left
+ *   for claims and cancellations.
+ *
+ * None of this stops a determined attacker with a script and fresh keys from
+ * spending the relayer down to its reserve. Doing that needs a durable rate
+ * limit, which needs a store this project does not have yet.
  */
 import { NextResponse } from "next/server";
-import { createWalletClient, encodeFunctionData, http, isAddress, isHex, type Address, type Hex } from "viem";
+import {
+  createWalletClient, encodeFunctionData, http, isAddress, isHex, parseEther, recoverTypedDataAddress,
+  type Address, type Hex,
+} from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { monadTestnet } from "viem/chains";
 import { publicClient } from "@/lib/chain";
-import { IRIS, irisAbi } from "@/lib/iris";
+import { IRIS, irisAbi, AUSD, balanceOf } from "@/lib/iris";
+import { DOMAIN, TYPES, noteHash } from "@/lib/authorize";
 import { DELEGATE } from "@/lib/delegate";
 
 export const runtime = "nodejs";
@@ -32,6 +55,14 @@ const faucetAbi = [
   { type: "function", name: "requestFunds", stateMutability: "nonpayable",
     inputs: [{ type: "address" }], outputs: [] },
 ] as const;
+
+/**
+ * Gas the relayer protects for itself. Below RESERVE it stops topping senders
+ * up — that is the demo's convenience, not the product. Below FLOOR it stops
+ * entirely rather than fail halfway through somebody's claim.
+ */
+const RESERVE = parseEther("1");
+const FLOOR = parseEther("0.25");
 
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 6;
@@ -69,8 +100,21 @@ const note = (v: unknown): v is Note => {
 
 type Call = { address: Address; abi: readonly unknown[]; functionName: string; args: readonly unknown[] };
 
+/** A creation's authorization, kept so it can be verified before anything is spent. */
+type Funding = {
+  from: Address;
+  value: bigint;
+  validBefore: bigint;
+  salt: Hex;
+  signature: Hex;
+  schedule: {
+    claimSigner: Address; amountPerPayment: bigint; interval: number;
+    paymentsTotal: number; startNow: boolean; note: Note;
+  };
+};
+
 /** Translate a request into exactly one known call, or refuse it. */
-function resolve(body: Record<string, unknown>): { call: Call; subject: string } | string {
+function resolve(body: Record<string, unknown>): { call: Call; subject: string; funding?: Funding } | string {
   switch (body.action) {
     case "claim": {
       const { id, recipient, signature } = body;
@@ -94,14 +138,16 @@ function resolve(body: Record<string, unknown>): { call: Call; subject: string }
         call: { address: IRIS, abi: irisAbi as readonly unknown[], functionName: "createToClaimWithAuthorization",
           args: [from, claimSigner, BigInt(amountPerPayment), Number(interval),
                  Number(paymentsTotal), startNow, 0n, BigInt(validBefore), salt, signature, said] },
+        funding: {
+          from, salt, signature,
+          value: BigInt(amountPerPayment) * BigInt(paymentsTotal),
+          validBefore: BigInt(validBefore),
+          schedule: {
+            claimSigner, amountPerPayment: BigInt(amountPerPayment), interval: Number(interval),
+            paymentsTotal: Number(paymentsTotal), startNow, note: said,
+          },
+        },
       };
-    }
-    case "fund": {
-      // Testnet only: hands the caller AUSD so a demo can be run end to end.
-      const { to } = body;
-      if (!addr(to)) return "Invalid address.";
-      return { subject: to.toLowerCase(),
-        call: { address: FAUCET, abi: faucetAbi as readonly unknown[], functionName: "requestFunds", args: [to] } };
     }
     default:
       return "Unknown action.";
@@ -182,12 +228,32 @@ export async function POST(request: Request) {
   const account = privateKeyToAccount(key);
   const wallet = createWalletClient({ account, chain: monadTestnet, transport: http(process.env.MONAD_RPC_URL) });
 
+  const gas = await publicClient.getBalance({ address: account.address });
+  if (gas < FLOOR) {
+    return NextResponse.json(
+      { error: "The demo has run out of test gas and needs a top-up before it can send anything." },
+      { status: 503 }
+    );
+  }
+
   if (body.action === "cancel") {
     const stop = await cancellation(body);
     if (typeof stop === "string") return NextResponse.json({ error: stop }, { status: 400 });
     if (throttled(ip) || throttled(stop.subject)) {
       return NextResponse.json({ error: "Too many attempts. Try again shortly." }, { status: 429 });
     }
+    // A forged signature passes every check above — the sender of any
+    // commitment is public — and would only fail inside the delegate, after
+    // the relayer had paid for the attempt. Simulating the type-4 call first
+    // means it fails here instead, for free.
+    try {
+      await publicClient.call({
+        account, to: stop.to, data: stop.data, authorizationList: [stop.authorization],
+      } as never);
+    } catch {
+      return NextResponse.json({ error: "This cancellation was not signed by the sender." }, { status: 400 });
+    }
+
     try {
       const hash = await wallet.sendTransaction({
         authorizationList: [stop.authorization],
@@ -212,7 +278,50 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many attempts. Try again shortly." }, { status: 429 });
   }
 
-  const { call } = resolved;
+  const { call, funding } = resolved;
+
+  if (funding) {
+    const { from, value, validBefore, salt, signature, schedule } = funding;
+
+    // Checked off chain, so a creation nobody actually signed costs nothing —
+    // not the simulation, and above all not a top-up.
+    const nonce = (await publicClient.readContract({
+      address: IRIS, abi: irisAbi, functionName: "authorizationNonce",
+      args: [salt, schedule.claimSigner, schedule.amountPerPayment, schedule.interval,
+             schedule.paymentsTotal, schedule.startNow, noteHash(schedule.note)],
+    })) as Hex;
+
+    const signer = await recoverTypedDataAddress({
+      domain: { ...DOMAIN, chainId: monadTestnet.id, verifyingContract: AUSD },
+      types: TYPES,
+      primaryType: "ReceiveWithAuthorization",
+      message: { from, to: IRIS, value, validAfter: 0n, validBefore, nonce },
+      signature,
+    }).catch(() => undefined);
+
+    if (!signer || signer.toLowerCase() !== from.toLowerCase()) {
+      return NextResponse.json(
+        { error: "This commitment was not signed by the account paying for it." },
+        { status: 400 }
+      );
+    }
+
+    // On testnet the sender's balance is a stage prop, so the relayer supplies
+    // it — but only here, behind a genuine signature, and never below reserve.
+    if ((await balanceOf(from)) < value) {
+      if (gas < RESERVE) {
+        return NextResponse.json(
+          { error: "The demo's test funds are running low. Try a smaller amount, or come back shortly." },
+          { status: 503 }
+        );
+      }
+      const topUp = await wallet.writeContract({
+        address: FAUCET, abi: faucetAbi, functionName: "requestFunds", args: [from],
+        account, chain: monadTestnet,
+      });
+      await publicClient.waitForTransactionReceipt({ hash: topUp });
+    }
+  }
 
   try {
     // Simulating first means a doomed request costs the relayer nothing, and
