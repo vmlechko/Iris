@@ -583,7 +583,10 @@ So signing in now keeps the key for three minutes, for exactly one action: the
 first send. It is zeroed when that send finishes, when the time runs out, when
 the person signs out, or when the page goes away, and the sending screen says
 how long is left rather than letting it vanish. From landing to a confirmed
-commitment that is one Face ID instead of two.
+commitment that is now **three taps and one Face ID** — *Continue with Face ID*,
+*Send money*, *Set it aside* — because the sending form arrives filled in. The
+relayer then confirms in roughly one to three and a half seconds, as timed by
+`scripts/cancel-relay.ts`. It was two Face IDs before.
 
 Everything else asks again, and that split is the design rather than an
 accident. `withSigner` refuses the session unless an action opts in, and only

@@ -57,7 +57,11 @@ instantly as the commitment opens; the second is what the workflow picks up.
 
 ## A run that worked
 
-8 September 2026, against the deployed contracts:
+8 September 2026 — against the **previous** deployment, `IrisCommitments`
+`0x7ed55fed7346ef9b5d4a92771486dcbb1c7b6c14` and the simulation receiver
+`0x9d1e5e57dda0f1a0e48e596982858cbc7a8e8e78`. The contracts were redeployed on
+8 September 2026 to carry a note on each commitment, and this run has not yet been
+repeated against the addresses above:
 
 ```
 [USER LOG] examined 2 commitments, 1 due
@@ -65,7 +69,7 @@ instantly as the commitment opens; the second is what the workflow picks up.
 [USER LOG] released 1 payment(s) — 0x0c6501ea589f1cfc98b6c9ed90349c6d8c5d339ed8b9f0e8df61caba9e8d060c
 ```
 
-On chain afterwards: commitment #1 at 2 payments of 3, the rate recorded on the
+On chain afterwards: commitment #1 at 2 payments of 3, the rate recorded on that
 scheduler as `1 USD = 1321.225569 NGN`, the recipient one AUSD richer — and
 still holding exactly zero native MON, which is the point.
 
