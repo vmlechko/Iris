@@ -9,6 +9,7 @@ import { register, NoPrfError } from "@/lib/account";
 import { relay } from "@/lib/relay";
 import { getCommitment, getNote, cadenceLabel, money, remaining, IRIS, type Commitment, type Note } from "@/lib/iris";
 import Steps from "@/app/components/Steps";
+import LocalAmount from "@/app/components/LocalAmount";
 import { readKeyFromHash, type ClaimLink } from "@/lib/link";
 
 type Phase =
@@ -162,6 +163,9 @@ export default function ClaimClient({ id }: { id: string }) {
       <h1>
         {money(c.amountPerPayment)} <em>now</em>.
       </h1>
+      {/* The first screen a stranger sees, and the one place the question
+          "how much is that for me" matters most. */}
+      <LocalAmount amount={c.amountPerPayment} detail />
       <p className="lede">
         Then {money(c.amountPerPayment)} {cadenceLabel(c.interval)}, {left - 1} more{" "}
         {left - 1 === 1 ? "time" : "times"}. All {money(remaining(c))} of it is

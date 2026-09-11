@@ -19,6 +19,7 @@ import { withSigner } from "@/lib/account";
 import { cancelCommitment } from "@/lib/delegate";
 import { paymentsFor, type Payment } from "@/lib/indexer";
 import Steps from "@/app/components/Steps";
+import LocalAmount from "@/app/components/LocalAmount";
 import { money, cadenceLabel, whenNext, remaining, getNote, type Commitment, type Note } from "@/lib/iris";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -98,6 +99,7 @@ export default function Detail({
       <h1 className="sentence">
         {money(commitment.amountPerPayment)} <em>{cadenceLabel(commitment.interval)}</em>
       </h1>
+      {!mine && <LocalAmount amount={commitment.amountPerPayment} detail />}
 
       <p className="lede">
         {mine

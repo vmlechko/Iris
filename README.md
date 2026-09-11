@@ -493,6 +493,30 @@ It is what makes the chat card work: the preview a messenger draws is built from
 the chain, so the card reads *"Mum is setting aside $200 for you, every month"*
 before anyone has opened anything.
 
+## What it is worth at home
+
+"$200" is the promise, and it is exact: AUSD tracks the dollar and the escrow
+holds it. But nobody receiving support thinks in dollars, and the concept's
+secondary pain was that no one shows honestly how much arrives in hand. So the
+screens a recipient sees add a quieter line: *≈ ₦265,000 at today's rate*.
+
+- **The currency comes from the device's language and region.** Nobody is asked
+  and nothing is stored. A wrong guess costs one grey line; a US locale shows
+  nothing, because "≈ $200" under "$200" would say nothing.
+- **The rate prefers the one Chainlink CRE recorded on chain**, when it is for
+  the same currency, and says so. Otherwise it uses the same public source the
+  workflow reads, and says "today's rate".
+- **It is rounded to three significant figures**, so an estimate never passes
+  for a quote.
+- **Where the local sign is a dollar sign, it shows the code.** The Argentine and
+  Mexican pesos are written "$" at home, and beside "$200" that read as "$200 is
+  about $303,000". They now read *≈ ARS 303.000*.
+
+It appears only where the recipient is looking: the claim screen, what is coming
+in, and a commitment they are receiving. Not on the sender's screens — their
+device cannot know the recipient's currency — and not in the chat card, which a
+crawler with no region draws.
+
 ## History
 
 The chain knows what a commitment *is* — how many payments have gone out, when

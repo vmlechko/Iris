@@ -6,6 +6,7 @@ import type { Address } from "viem";
 import { signIn, endSession, NoPrfError } from "@/lib/account";
 import { incomingOf, outgoingOf, balanceOf, money, remaining, whenNext, cadenceLabel, type Commitment } from "@/lib/iris";
 import Detail from "@/app/components/Detail";
+import LocalAmount from "@/app/components/LocalAmount";
 import { notesFor } from "@/lib/indexer";
 
 type State =
@@ -24,6 +25,9 @@ function Row({ c, side, name, onOpen }: { c: Commitment; side: "in" | "out"; nam
         <span className="rowmain">
           <strong>{money(c.amountPerPayment)}</strong>{" "}
           <span className="muted">{cadenceLabel(c.interval)}</span>
+          {/* Only on what is coming in: the sender's device cannot know the
+              recipient's currency, and guessing it from their own would lie. */}
+          {side === "in" && <> <LocalAmount amount={c.amountPerPayment} /></>}
           <span className="muted small block">
             {side === "in"
               ? `from ${name ?? short(c.sender)}`
