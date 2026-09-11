@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Address } from "viem";
-import { register, restore, NoPrfError } from "@/lib/account";
+import { signIn, endSession, NoPrfError } from "@/lib/account";
 import { incomingOf, outgoingOf, balanceOf, money, remaining, whenNext, cadenceLabel, type Commitment } from "@/lib/iris";
 import Detail from "@/app/components/Detail";
 import { notesFor } from "@/lib/indexer";
@@ -49,8 +49,9 @@ export default function Home() {
   const enter = async (fn: () => Promise<Address>) => {
     setState({ at: "working" });
     try {
-      // Only the address is kept. The key was zeroed before this resolved and
-      // is derived again, with a fresh prompt, whenever money moves.
+      // Signing in keeps the key for three minutes, for the first send only,
+      // so that send does not ask for a second finger. Everything else derives
+      // it again with a fresh prompt. See signIn in lib/account.ts.
       const address = await fn();
       const [incoming, outgoing, held] = await Promise.all([
         incomingOf(address), outgoingOf(address), balanceOf(address),
@@ -95,7 +96,7 @@ export default function Home() {
       <main className="wrap">
         <header className="topline">
           <p className="eyebrow">Your account</p>
-          <button className="linkish" onClick={() => setState({ at: "out" })}>Sign out</button>
+          <button className="linkish" onClick={() => { endSession(); setState({ at: "out" }); }}>Sign out</button>
         </header>
         {/* The answer to "how much do I have", which any account owes its
             owner — and which the sending screen used to give only as a reason
@@ -160,10 +161,10 @@ export default function Home() {
       </p>
 
       <div className="actions">
-        <button onClick={() => enter(register)} disabled={state.at === "working"}>
+        <button onClick={() => enter(() => signIn("register"))} disabled={state.at === "working"}>
           {state.at === "working" ? "Waiting…" : "Continue with Face ID"}
         </button>
-        <button className="ghost" onClick={() => enter(restore)} disabled={state.at === "working"}>
+        <button className="ghost" onClick={() => enter(() => signIn("restore"))} disabled={state.at === "working"}>
           I already have an account
         </button>
       </div>

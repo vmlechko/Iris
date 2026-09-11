@@ -118,13 +118,69 @@ export const register = () => addressOnly("register");
 export const restore = () => addressOnly("restore");
 
 /**
+ * How long signing in keeps the key, and for what.
+ *
+ * Without this, a first payment costs two Face ID prompts: one to create the
+ * account, one to derive the key again a minute later to send. Mera judges time
+ * to first transaction, and the second prompt buys nothing — the person proved
+ * they were there seconds ago.
+ *
+ * So signing in holds the key for three minutes, for exactly one thing: the
+ * first send. It is zeroed the moment that send finishes, when the time runs
+ * out, when the person signs out, or when the page goes away. Anything else —
+ * above all stopping a commitment — asks again, because that is the action
+ * someone standing at an unlocked phone would want to take.
+ */
+const SIGN_IN_SESSION_MS = 180_000;
+
+let current: Session | undefined;
+
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", () => endSession());
+}
+
+/** Sign in and keep a short session for the first send. */
+export async function signIn(mode: "register" | "restore"): Promise<Address> {
+  endSession();
+  current = Session.adopt(await derive(mode), SIGN_IN_SESSION_MS);
+  return current.address;
+}
+
+/** The session from signing in, if it is still open. */
+export function currentSession(): Session | undefined {
+  return current?.open ? current : undefined;
+}
+
+/** Zero the held key now. Safe to call when there is none. */
+export function endSession(): void {
+  current?.close();
+  current = undefined;
+}
+
+/**
  * Run one piece of work that needs to sign, then zero the key.
  *
  * The account handed to `fn` stops working the moment this returns, so a stray
  * reference cannot be used later — Mera throws `SESSION_ENDED` on any signing
  * method after `end()`.
+ *
+ * `allowSession` is off by default on purpose. An action has to ask to ride on
+ * the sign-in session, and when it does the session is spent: it covers one
+ * action, not "whatever happens next".
  */
-export async function withSigner<T>(fn: (account: LocalAccount) => Promise<T>): Promise<T> {
+export async function withSigner<T>(
+  fn: (account: LocalAccount) => Promise<T>,
+  { allowSession = false }: { allowSession?: boolean } = {}
+): Promise<T> {
+  const held = allowSession ? currentSession() : undefined;
+  if (held) {
+    try {
+      return await fn(held.use());
+    } finally {
+      endSession();
+    }
+  }
+
   const session = await derive("restore");
   try {
     return await fn(toViemAccount(session));
@@ -159,6 +215,11 @@ export class Session {
 
   static async open(ttlMs = 120_000): Promise<Session> {
     return new Session(await derive("restore"), ttlMs);
+  }
+
+  /** Hold a key that was just derived, rather than asking for a finger again. */
+  static adopt(session: Secp256k1SigningSession, ttlMs: number): Session {
+    return new Session(session, ttlMs);
   }
 
   get open(): boolean {

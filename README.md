@@ -332,6 +332,7 @@ npm run claim-link             # claim links, including an attempt to steal one
 npx tsx scripts/exploit-poc.ts # the authorization exploit we found, still refuted
 npx tsx scripts/cancel-gasless.ts   # cancelling from an account holding nothing
 npx tsx scripts/cancel-relay.ts     # the same through the relayer (needs npm run dev)
+npx tsx scripts/session-check.ts    # the sign-in session closes, and stays closed
 cd indexer && npm test         # the indexer's handlers, no database, no network
 ```
 
@@ -546,6 +547,26 @@ would be stranded at yesterday's identity. What should be ephemeral is the
 key's residence in memory, not its value. The claim-link key is the opposite
 case and is genuinely per-commitment: generated for one link, single-use by
 construction, dead once claimed.
+
+### The one exception: signing in
+
+Mera judges time to first transaction, and holding nothing cost a prompt: a
+first payment asked for Face ID once to create the account and again a minute
+later to derive the key and send. The second prompt bought nothing — the person
+had proved they were there seconds before.
+
+So signing in now keeps the key for three minutes, for exactly one action: the
+first send. It is zeroed when that send finishes, when the time runs out, when
+the person signs out, or when the page goes away, and the sending screen says
+how long is left rather than letting it vanish. From landing to a confirmed
+commitment that is one Face ID instead of two.
+
+Everything else asks again, and that split is the design rather than an
+accident. `withSigner` refuses the session unless an action opts in, and only
+the first send does. Stopping a commitment never rides it: that is the one
+action someone picking up an unlocked phone might take. The person receiving
+never gets a session at all — they sign nothing with their account key, so
+there is nothing to hold.
 
 ## Security
 

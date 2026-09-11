@@ -70,6 +70,8 @@ export default function Detail({
   const stop = async () => {
     setStopping({ at: "working", step: 0 });
     try {
+      // Never rides the sign-in session. Stopping a commitment is the one
+      // thing someone picking up an unlocked phone might do, so it always asks.
       const { hash } = await withSigner((account) => {
         setStopping({ at: "working", step: 1 });
         return cancelCommitment(account, commitment.id);

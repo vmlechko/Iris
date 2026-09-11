@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { generatePrivateKey } from "viem/accounts";
 import type { Hex } from "viem";
-import { withSigner } from "@/lib/account";
+import { withSigner, currentSession } from "@/lib/account";
 import { authorizeCommitment } from "@/lib/authorize";
 import { relay } from "@/lib/relay";
 import { publicClient } from "@/lib/chain";
@@ -28,6 +28,22 @@ export default function Send() {
   const [busy, setBusy] = useState(false);
   /** Which named step the person is watching. -1 while nothing is running. */
   const [step, setStep] = useState(-1);
+  const [steps, setSteps] = useState<readonly string[]>(SENDING);
+
+  // Seconds left on the session from signing in, or 0 once there is none. The
+  // button says whether it will ask for Face ID, and the answer changes while
+  // the person is still typing — so it is read every second, not once.
+  const [sessionLeft, setSessionLeft] = useState(0);
+  useEffect(() => {
+    const read = () => {
+      const held = currentSession();
+      setSessionLeft(held ? Math.ceil(held.remainingMs / 1000) : 0);
+    };
+    read();
+    const timer = setInterval(read, 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const prompted = sessionLeft === 0;
   const [error, setError] = useState("");
   const [done, setDone] = useState<Done | undefined>();
 
@@ -42,6 +58,10 @@ export default function Send() {
   const valid = per > 0n && count > 0;
 
   async function create() {
+    // Decided once, at the tap: a session that expires mid-flight should not
+    // change which steps the person is shown.
+    const riding = currentSession() !== undefined;
+    setSteps(riding ? SENDING.slice(1) : SENDING);
     setBusy(true);
     setStep(0);
     setError("");
@@ -62,7 +82,7 @@ export default function Send() {
       };
 
       const { hash } = await withSigner(async (account) => {
-        setStep(1);
+        setStep(riding ? 0 : 1);
         // Topping the account up on testnet happens on the server, inside the
         // creation and behind its signature — there is no separate request for
         // funds that a loop could hammer.
@@ -80,9 +100,9 @@ export default function Send() {
           signature: auth.signature,
           note,
         });
-      });
+      }, { allowSession: true });
 
-      setStep(2);
+      setStep(riding ? 1 : 2);
       const id =
         ((await publicClient.readContract({
           address: IRIS,
@@ -226,9 +246,15 @@ export default function Send() {
           onClick={create}
           disabled={!valid || busy}
         >
-          {busy ? "Setting it aside…" : "Set it aside with Face ID"}
+          {busy ? "Setting it aside…" : prompted ? "Set it aside with Face ID" : "Set it aside"}
         </button>
-        {busy && <Steps steps={SENDING} current={step} />}
+        {!busy && !prompted && (
+          <p className="note">
+            You signed in a moment ago, so this will not ask for Face ID again —
+            for another {Math.floor(sessionLeft / 60)}:{String(sessionLeft % 60).padStart(2, "0")}.
+          </p>
+        )}
+        {busy && <Steps steps={steps} current={step} />}
       </div>
 
       <Link className="quiet" href="/">
