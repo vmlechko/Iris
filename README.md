@@ -55,7 +55,9 @@ There is nothing else to set up. No wallet, no extension, no seed phrase, no tes
 tokens to go and fetch: on testnet the sending account tops itself up behind the
 scenes, because sending someone to a faucet in the middle of a payment is the one
 thing this project is arguing against. In a real deployment that money would
-already be the sender's; Iris does not build an on-ramp.
+already be the sender's — the add-money screen shows where it would come from:
+a wallet today, a bank transfer through Agora and other networks through Aurora
+next.
 
 The person receiving needs nothing at all — not gas, not a balance, not an
 account. A claim link is not a request for payment: the money is already
@@ -63,7 +65,8 @@ escrowed before the link is sent.
 
 To see the whole thing:
 
-1. Open the app and continue with Face ID. That is the account.
+1. Open the app and continue with Face ID. That is the account. It asks where
+   your money is; choose *Try it with demo dollars*.
 2. Send a commitment — an amount, a cadence, a number of payments.
 3. Copy the link it gives you and open it in a private window, or on another
    device. That is the recipient, who has never used the app before.
@@ -98,6 +101,8 @@ itself — was written during the hackathon period.
 - **[Mera](https://docs.monad.xyz/guides/mera)** (`@category-labs/mera`) — passkey accounts, the entire account layer. No seed phrase, no extension.
 - **EIP-7702** — lets an account that holds nothing act for itself. Cancelling is the one thing only the sender may do, and `IrisDelegate` runs exactly the call they signed while a sponsor pays for it.
 - **AUSD** (Agora) — settlement asset, six decimals.
+- **Agora Public API** — `/v0/metrics`, the live count of AUSD on Monad shown on the first screen. Needs no key.
+- **[uqr](https://github.com/unjs/uqr)** (MIT) — the QR code on the add-money screen.
 - **Chainlink CRE** — the payment schedule runs as a workflow rather than on our server, so nobody has to trust our uptime.
 - **Envio HyperIndex** — payment history. Monad's public RPC caps `eth_getLogs` at a hundred blocks, and a schedule can run for a year.
 - **Next.js + Serwist** (PWA) — mobile experience, opened from a link.
@@ -394,6 +399,26 @@ and add one before this touches real money.
 
 ## The screens
 
+**Getting started.** Three lines on what Iris does, and one live number: how
+many AUSD are in circulation on Monad, read from Agora's public metrics
+(`lib/agora.ts`) — the answer to "is this dollar real?" before anyone is asked
+for a finger. Then Face ID, which is the whole of signing up.
+
+**Adding money.** A new account with nothing in it is asked where its money is,
+named by what the person has rather than by the rail underneath:
+
+- *A wallet* — works today. The account's address and a QR code, and the screen
+  watches the chain and says when the money lands.
+- *A bank account* — Agora's wire route: each account gets bank details and a
+  reference, and a transfer carrying it arrives as AUSD. It needs Agora's API
+  key and staging access, which we have asked for, so the screen explains it and
+  is marked *Soon* rather than faked.
+- *Another network* — Aurora Intents, which delivers from other chains onto
+  Monad. Aurora runs on mainnet only, so the same: explained, marked *Soon*.
+
+On testnet there is a fourth, labelled as what it is: *Try it with demo
+dollars*, because the relayer covers a sender's first payment (below).
+
 **The account.** What you hold, then what is coming and what you are sending.
 The balance leads because it is the first thing anyone wants from an account —
 and because the only place it used to appear was as a reason the sending screen
@@ -441,8 +466,10 @@ it honest is that it cannot cheat even if it wanted to: a claim carries the
 recipient inside the signature and a creation carries the schedule inside the
 nonce.
 
-The third action draws test AUSD from Agora's faucet so the demo can be run end
-to end. That one is scaffolding, and says so on screen.
+When a sender is short at the moment of a creation — on testnet, always — the
+relayer first checks their signature and then draws test AUSD for them from
+Agora's faucet, so the demo runs end to end. That is scaffolding, and the
+add-money screen says so.
 
 ## The scheduler
 
@@ -584,7 +611,7 @@ first send. It is zeroed when that send finishes, when the time runs out, when
 the person signs out, or when the page goes away, and the sending screen says
 how long is left rather than letting it vanish. From landing to a confirmed
 commitment that is now **three taps and one Face ID** — *Continue with Face ID*,
-*Send money*, *Set it aside* — because the sending form arrives filled in. The
+*Try it with demo dollars*, *Set it aside* — because the sending form arrives filled in. The
 relayer then confirms in roughly one to three and a half seconds, as timed by
 `scripts/cancel-relay.ts`. It was two Face IDs before.
 

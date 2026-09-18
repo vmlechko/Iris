@@ -537,3 +537,100 @@ button.danger {
 }
 
 .quiet:hover { color: var(--fg); }
+
+/* --- onboarding --------------------------------------------------------- */
+
+/* Three lines are the whole explanation. Numbered, because the order is the
+   point: amount, link, arrival. */
+.how {
+  list-style: none;
+  counter-reset: how;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.how li {
+  counter-increment: how;
+  display: grid;
+  grid-template-columns: 1.6rem 1fr;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.how li::before {
+  content: counter(how);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.how strong { color: var(--fg); font-weight: 500; }
+
+/* A screen title below the eyebrow: smaller than the landing's headline, which
+   is the only place that gets to shout. */
+.title {
+  font-size: clamp(1.6rem, 6vw, 2rem);
+}
+
+.ways .rowbutton { align-items: center; }
+
+.tag {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  white-space: nowrap;
+}
+
+.demo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.deposit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* White behind the code in both themes: scanners want dark on light. */
+.qr {
+  width: 11rem;
+  background: #fff;
+  border-radius: 0.9rem;
+  padding: 0.6rem;
+  margin-bottom: 0.4rem;
+}
+
+.qr svg { display: block; width: 100%; height: auto; }
+
+.watching {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.4rem 0 0;
+}
+
+.pulse {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.6s ease-in-out infinite;
+  flex: none;
+}
+
+@keyframes pulse {
+  50% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse { animation: none; }
+}

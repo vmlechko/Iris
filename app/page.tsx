@@ -1,18 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Address } from "viem";
 import { signIn, endSession, NoPrfError } from "@/lib/account";
 import { incomingOf, outgoingOf, balanceOf, money, remaining, whenNext, cadenceLabel, type Commitment } from "@/lib/iris";
 import Detail from "@/app/components/Detail";
 import LocalAmount from "@/app/components/LocalAmount";
+import AddMoney from "@/app/components/AddMoney";
+import { ausdOnMonad, scale } from "@/lib/agora";
 import { notesFor } from "@/lib/indexer";
 
 type State =
   | { at: "out" }
   | { at: "working" }
-  | { at: "in"; address: Address; incoming: Commitment[]; outgoing: Commitment[]; open: Commitment | null; names: Map<string, string>; held: bigint }
+  | { at: "in"; address: Address; incoming: Commitment[]; outgoing: Commitment[]; open: Commitment | null; names: Map<string, string>; held: bigint;
+      /** The add-money screen, and whether it is the last step of signing up. */
+      adding: { first: boolean } | null }
   | { at: "error"; message: string };
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -50,7 +54,14 @@ function Row({ c, side, name, onOpen }: { c: Commitment; side: "in" | "out"; nam
 export default function Home() {
   const [state, setState] = useState<State>({ at: "out" });
 
-  const enter = async (fn: () => Promise<Address>) => {
+  // Agora's own count of the dollar Iris pays in, live. Shown only if it
+  // arrives: an introduction should never wait on a third party.
+  const [inUse, setInUse] = useState<number | undefined>();
+  useEffect(() => {
+    ausdOnMonad().then(setInUse);
+  }, []);
+
+  const enter = async (fn: () => Promise<Address>, fresh = false) => {
     setState({ at: "working" });
     try {
       // Signing in keeps the key for three minutes, for the first send only,
@@ -63,7 +74,11 @@ export default function Home() {
       // Names are a nicety: if the indexer is unreachable the list falls back
       // to addresses rather than failing to open.
       const names = (await notesFor(incoming.map((c) => c.id))) ?? new Map<string, string>();
-      setState({ at: "in", address, incoming, outgoing, open: null, names, held });
+      // Someone who has just made an account and has nothing yet is asked where
+      // their money is before anything else — an empty account with a "Send"
+      // button is a dead end.
+      const empty = incoming.length === 0 && outgoing.length === 0 && held === 0n;
+      setState({ at: "in", address, incoming, outgoing, open: null, names, held, adding: fresh && empty ? { first: true } : null });
     } catch (e) {
       const err = e as Error;
       if (err.name === "NotAllowedError") {
@@ -80,8 +95,19 @@ export default function Home() {
       incomingOf(address), outgoingOf(address), balanceOf(address),
     ]);
     const names = (await notesFor(incoming.map((c) => c.id))) ?? new Map<string, string>();
-    setState({ at: "in", address, incoming, outgoing, open: null, names, held });
+    setState({ at: "in", address, incoming, outgoing, open: null, names, held, adding: null });
   };
+
+  if (state.at === "in" && state.adding) {
+    return (
+      <AddMoney
+        address={state.address}
+        held={state.held}
+        first={state.adding.first}
+        onBack={() => refresh(state.address)}
+      />
+    );
+  }
 
   if (state.at === "in" && state.open) {
     return (
@@ -149,6 +175,7 @@ export default function Home() {
 
         <div className="actions">
           <Link className="button" href="/send">Send money</Link>
+          <button className="ghost" onClick={() => setState({ ...state, adding: { first: false } })}>Add money</button>
         </div>
       </main>
     );
@@ -164,8 +191,21 @@ export default function Home() {
         before it lands. No app to install, no wallet, no seed phrase.
       </p>
 
+      <ol className="how">
+        <li><span><strong>Choose how much and how often.</strong> $200 a month, for six months.</span></li>
+        <li><span><strong>Send them a link.</strong> They open it and see every payment coming.</span></li>
+        <li><span><strong>It arrives on schedule.</strong> Stop it whenever you want.</span></li>
+      </ol>
+
+      {inUse && (
+        <p className="small muted">
+          Paid in AUSD, the digital dollar issued by Agora — {scale(inUse)} of it
+          in use on the network Iris runs on.
+        </p>
+      )}
+
       <div className="actions">
-        <button onClick={() => enter(() => signIn("register"))} disabled={state.at === "working"}>
+        <button onClick={() => enter(() => signIn("register"), true)} disabled={state.at === "working"}>
           {state.at === "working" ? "Waiting…" : "Continue with Face ID"}
         </button>
         <button className="ghost" onClick={() => enter(() => signIn("restore"))} disabled={state.at === "working"}>
