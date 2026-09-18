@@ -25,6 +25,7 @@ Working end to end on Monad testnet.
 - [x] Cancellation without gas, through EIP-7702
 - [x] The schedule as a Chainlink CRE workflow, delivering reports on chain
 - [x] History through an Envio indexer, deployed
+- [x] Agora Instant Settlement on receipt — gasless for the recipient, 10/10 on chain
 - [ ] Deployed at a public address
 
 ## Deployed on Monad testnet
@@ -35,6 +36,8 @@ Working end to end on Monad testnet.
 | `IrisScheduler` — production | [`0x67b9053d1e1232b5219bcc2be2e68365f48204b1`](https://testnet.monadexplorer.com/address/0x67b9053d1e1232b5219bcc2be2e68365f48204b1) |
 | `IrisScheduler` — simulation | [`0x0e7fc813ef8c28b0d41294feb86512afc3c3fd27`](https://testnet.monadexplorer.com/address/0x0e7fc813ef8c28b0d41294feb86512afc3c3fd27) |
 | `IrisDelegate` | [`0xc018dffd9d15e8b63be2252ebb28fb5e2367674c`](https://testnet.monadexplorer.com/address/0xc018dffd9d15e8b63be2252ebb28fb5e2367674c) |
+| `IrisSettle` | [`0x2583ced441aa350855426a329c8aad2bf28320a3`](https://testnet.monadexplorer.com/address/0x2583ced441aa350855426a329c8aad2bf28320a3) |
+| Agora Instant Settlement — AUSD/CTK pair | [`0x1Aa8958Aa34cEC8096EF4381cb335effe977b0ae`](https://testnet.monadexplorer.com/address/0x1Aa8958Aa34cEC8096EF4381cb335effe977b0ae) |
 | AUSD (Agora) | [`0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC`](https://testnet.monadexplorer.com/address/0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC) |
 
 There are two schedulers because the Chainlink forwarder address is immutable in
@@ -71,6 +74,8 @@ To see the whole thing:
 3. Copy the link it gives you and open it in a private window, or on another
    device. That is the recipient, who has never used the app before.
 4. Continue with Face ID there. The first payment arrives as the link is opened.
+   Choose *CTK, settled instantly* first to see it go through Agora Instant
+   Settlement on the way in — still one Face ID, still no gas.
 5. Back on the sender's screen, open the commitment to see what has already been
    paid, and stop it if you like — the refund returns what has not yet come due.
 
@@ -101,6 +106,7 @@ itself — was written during the hackathon period.
 - **[Mera](https://docs.monad.xyz/guides/mera)** (`@category-labs/mera`) — passkey accounts, the entire account layer. No seed phrase, no extension.
 - **EIP-7702** — lets an account that holds nothing act for itself. Cancelling is the one thing only the sender may do, and `IrisDelegate` runs exactly the call they signed while a sponsor pays for it.
 - **AUSD** (Agora) — settlement asset, six decimals.
+- **Agora Instant Settlement** — the AUSD/CTK pair on Monad testnet, through `IrisSettle`.
 - **Agora Public API** — `/v0/metrics`, the live count of AUSD on Monad shown on the first screen. Needs no key.
 - **[uqr](https://github.com/unjs/uqr)** (MIT) — the QR code on the add-money screen.
 - **Chainlink CRE** — the payment schedule runs as a workflow rather than on our server, so nobody has to trust our uptime.
@@ -499,6 +505,40 @@ Releasing stays permissionless, so the scheduler holds no power over anyone's
 money. If the workflow stops, payments are pushed by whoever wants them
 pushed — the recipient included. `IrisScheduler` also swallows a failure on any
 single commitment, so one that cannot pay does not hold up the rest of the batch.
+
+## Settling through Agora
+
+The person receiving can have a payment settled into another stablecoin the
+moment it arrives, through Agora Instant Settlement — Agora's fixed-price swap.
+On the claim screen it is one choice, *Receive it as*: dollars, as sent, or
+CTK, settled instantly.
+
+They hold no gas, so they cannot call Agora's pair themselves. Instead:
+
+1. The claim lands, and the app reads exactly how much it brought in.
+2. The recipient's passkey signs one ERC-3009 authorization for that amount to
+   `IrisSettle` — inside the same Face ID as the claim, because signing in keeps
+   the key for those few seconds.
+3. The relayer submits it. `IrisSettle` takes the AUSD, swaps it through the
+   pair at Agora's price, and sends the output straight to the signer — there
+   is no `to` parameter a relayer could change. The floor is bound into the
+   ERC-3009 nonce, so it cannot be lowered either. The contract holds nothing
+   between calls.
+
+`IrisSettle` holds the pair's `APPROVED_SWAPPER` role, granted through Agora's
+testnet whitelister (`scripts/deploy-settle.ts`, which refuses to finish until
+the role reads back). On mainnet that role follows Agora's verification.
+
+`scripts/settle-check.ts` runs it on chain against a fresh account holding no
+MON: settled in one transaction in about 0.6 s, exactly the quote delivered,
+nothing left in the contract, and a lowered floor, an inflated amount, someone
+else's funds and a replay all refused — 10/10.
+
+**What CTK is.** Agora's own test token, priced one for one against AUSD. On
+Monad testnet the AUSD/CTK pair is the only one; on mainnet the same pair
+contract is AUSD/USDC. The screen calls CTK a test token standing in for USDC,
+because presenting it as anyone's local currency would be untrue. The local
+currency line above it stays what it was: an estimate at today's rate.
 
 ## What the sender says
 

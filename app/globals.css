@@ -634,3 +634,38 @@ button.danger {
 @media (prefers-reduced-motion: reduce) {
   .pulse { animation: none; }
 }
+
+/* --- receive as --------------------------------------------------------- */
+
+.choice {
+  border: 0;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.choice legend { margin-bottom: 0.5rem; }
+
+.option {
+  display: grid;
+  grid-template-columns: 1.25rem 1fr;
+  gap: 0.6rem;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  padding: 0.8rem 0.9rem;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: border-color 0.15s ease;
+}
+
+.option.on { border-color: var(--accent); }
+
+.option input {
+  accent-color: var(--accent);
+  margin: 0.2rem 0 0;
+}
+
+.option strong { font-weight: 500; }

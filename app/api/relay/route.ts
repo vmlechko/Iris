@@ -1,5 +1,5 @@
 /**
- * The relayer. Three actions, no more.
+ * The relayer. Four actions, no more.
  *
  * Both halves of Iris work from an empty account: the person receiving arrives
  * through a passkey holding nothing, and the person sending signs rather than
@@ -13,7 +13,8 @@
  * What keeps it honest is that the signatures do the real work. A claim carries
  * the recipient inside the signature; a creation carries the whole schedule
  * inside the ERC-3009 nonce; a cancellation carries the target and the calldata
- * inside the digest IrisDelegate checks. Even a relayer acting in bad faith
+ * inside the digest IrisDelegate checks; a settlement carries its floor inside
+ * the nonce and pays out only to whoever signed it. Even a relayer acting in bad faith
  * cannot point any of them somewhere else.
  *
  * What the signatures do not protect is the relayer's own gas. The throttle
@@ -46,6 +47,7 @@ import { publicClient } from "@/lib/chain";
 import { IRIS, irisAbi, AUSD, balanceOf } from "@/lib/iris";
 import { DOMAIN, TYPES, noteHash } from "@/lib/authorize";
 import { DELEGATE } from "@/lib/delegate";
+import { SETTLE, settleAbi } from "@/lib/settle";
 
 export const runtime = "nodejs";
 
@@ -123,6 +125,20 @@ function resolve(body: Record<string, unknown>): { call: Call; subject: string; 
         subject: recipient.toLowerCase(),
         call: { address: IRIS, abi: irisAbi as readonly unknown[], functionName: "claim",
           args: [BigInt(id), recipient, signature] as const },
+      };
+    }
+    case "settle": {
+      // No top-up and no gas for anyone but the relayer, so the simulation
+      // below is the whole check: an authorization the person did not sign,
+      // or a floor they did not sign, reverts there for free.
+      const { from, value, validBefore, salt, amountOutMin, signature } = body;
+      if (!addr(from) || !uint(value) || !uint(validBefore) || !b32(salt) || !uint(amountOutMin) || !sig(signature)) {
+        return "Invalid settlement.";
+      }
+      return {
+        subject: from.toLowerCase(),
+        call: { address: SETTLE, abi: settleAbi as readonly unknown[], functionName: "settle",
+          args: [from, BigInt(value), 0n, BigInt(validBefore), salt, BigInt(amountOutMin), signature] as const },
       };
     }
     case "create": {
