@@ -26,7 +26,7 @@ Working end to end on Monad testnet.
 - [x] The schedule as a Chainlink CRE workflow, delivering reports on chain
 - [x] History through an Envio indexer, deployed
 - [x] Agora Instant Settlement on receipt — gasless for the recipient, 10/10 on chain
-- [ ] Deployed at a public address
+- [x] Deployed at a public address — **[iris-eta-kohl.vercel.app](https://iris-eta-kohl.vercel.app)**
 
 ## Deployed on Monad testnet
 
@@ -47,6 +47,11 @@ other trusts the mock forwarder, which is what lets a local simulation deliver a
 report on chain instead of being rejected.
 
 ## For judges
+
+**[iris-eta-kohl.vercel.app](https://iris-eta-kohl.vercel.app)** — live on Monad
+testnet. `scripts/live-check.ts` runs the whole product against that deployment
+— a sender signs, a recipient claims, the payment settles through Agora — with
+every transaction put on chain by the deployment's own relayer: 5/5.
 
 **Open it in Safari, or in Chrome and choose iCloud Keychain when it asks where
 to save the passkey.** This is not a preference. Iris derives its keys through
