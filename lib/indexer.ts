@@ -12,16 +12,19 @@
  */
 /**
  * Envio gives every deployment its own address, and a stable one is a paid
- * feature. This default is whichever deployment was current when it was
- * written, and it only stays right while that deployment lives — redeploy the
- * indexer and it is stale. Set NEXT_PUBLIC_INDEXER_URL rather than trusting it.
+ * feature. Worse, every push to `main` deploys the indexer again — whether or
+ * not `indexer/` changed — and the plan keeps three, deleting the oldest. So an
+ * address written down here goes stale on its own, a few pushes later, and the
+ * history quietly empties out.
  *
- * The indexer only needs redeploying when `indexer/` itself changes; a push
- * that touches only the app can leave the running deployment alone.
+ * This default is therefore for local work only. The deployment reads
+ * NEXT_PUBLIC_INDEXER_URL, which is set on the host rather than committed:
+ * changing it needs no push, so it cannot start the cycle again. Set it last,
+ * after the final push, from the newest deployment in Envio.
  */
 const ENDPOINT =
   process.env.NEXT_PUBLIC_INDEXER_URL ??
-  "https://indexer.dev.hyperindex.xyz/415483c/v1/graphql";
+  "https://indexer.dev.hyperindex.xyz/2055141/v1/graphql";
 
 export type Payment = {
   id: string;

@@ -38,6 +38,12 @@ Working end to end on Monad testnet.
 | `IrisDelegate` | [`0xc018dffd9d15e8b63be2252ebb28fb5e2367674c`](https://testnet.monadexplorer.com/address/0xc018dffd9d15e8b63be2252ebb28fb5e2367674c) |
 | `IrisSettle` | [`0x2583ced441aa350855426a329c8aad2bf28320a3`](https://testnet.monadexplorer.com/address/0x2583ced441aa350855426a329c8aad2bf28320a3) |
 | Agora Instant Settlement — AUSD/CTK pair | [`0x1Aa8958Aa34cEC8096EF4381cb335effe977b0ae`](https://testnet.monadexplorer.com/address/0x1Aa8958Aa34cEC8096EF4381cb335effe977b0ae) |
+| Envio indexer | [`indexer.dev.hyperindex.xyz/2055141`](https://indexer.dev.hyperindex.xyz/2055141/v1/graphql) |
+
+The indexer's address is per deployment, and Envio redeploys on every push —
+so the app reads it from `NEXT_PUBLIC_INDEXER_URL` on the host, set after the
+last push rather than committed. If history looks empty, that address is a
+deployment that has since been rotated out.
 | AUSD (Agora) | [`0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC`](https://testnet.monadexplorer.com/address/0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC) |
 
 There are two schedulers because the Chainlink forwarder address is immutable in
@@ -52,6 +58,15 @@ report on chain instead of being rejected.
 testnet. `scripts/live-check.ts` runs the whole product against that deployment
 — a sender signs, a recipient claims, the payment settles through Agora — with
 every transaction put on chain by the deployment's own relayer: 5/5.
+
+**There are no test credentials, because there are no accounts to log into.**
+A passkey is the account: continue with Face ID (or Touch ID, or your laptop's
+screen lock) and you are in. Nothing is saved on the device, so the same passkey
+opens the same account anywhere — which is also how to try the stateless test:
+clear the site's storage mid-demo and sign in again.
+
+Test money is not something to go and fetch either: on testnet the sending
+account is topped up behind the scenes the moment it signs its first payment.
 
 **Open it in Safari, or in Chrome and choose iCloud Keychain when it asks where
 to save the passkey.** This is not a preference. Iris derives its keys through
