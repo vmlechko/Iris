@@ -13,7 +13,8 @@
     "lifecycle": "tsx scripts/lifecycle.ts",
     "get:ausd": "node scripts/get-ausd.mjs",
     "claim-link": "tsx scripts/claim-link.ts",
-    "deploy": "tsx scripts/deploy.ts"
+    "deploy": "tsx scripts/deploy.ts",
+    "health": "tsx scripts/health.ts"
   },
   "keywords": [],
   "author": "",

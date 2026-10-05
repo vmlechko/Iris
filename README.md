@@ -44,6 +44,11 @@ The indexer's address is per deployment, and Envio redeploys on every push —
 so the app reads it from `NEXT_PUBLIC_INDEXER_URL` on the host, set after the
 last push rather than committed. If history looks empty, that address is a
 deployment that has since been rotated out.
+
+`npm run health` asks the live deployment about all of this at once — that the
+page is served, that the relayer is configured, that Agora still lets
+`IrisSettle` swap, and that the indexer the deployed bundle points at is both
+answering and caught up with the chain.
 | AUSD (Agora) | [`0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC`](https://testnet.monadexplorer.com/address/0xa9012a055bd4e0eDfF8Ce09f960291C09D5322dC) |
 
 There are two schedulers because the Chainlink forwarder address is immutable in
