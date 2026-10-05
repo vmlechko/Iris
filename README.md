@@ -526,6 +526,12 @@ money. If the workflow stops, payments are pushed by whoever wants them
 pushed — the recipient included. `IrisScheduler` also swallows a failure on any
 single commitment, so one that cannot pay does not hold up the rest of the batch.
 
+Run on 5 October 2026 against the deployed contracts: the workflow examined 12
+commitments, found one due, read `1 USD = 1331.279356 NGN`, and delivered the
+report in [`0x86623e09`](https://testnet.monadexplorer.com/tx/0x86623e09c5c214090bda110fa08e1c9ffa3ba3990cea69ee05d321dfd83d36ff).
+The rate reads back off the scheduler, and the app shows it to anyone whose
+currency it is. Full log in `cre/README.md`.
+
 ## Settling through Agora
 
 The person receiving can have a payment settled into another stablecoin the

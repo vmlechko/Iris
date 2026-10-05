@@ -57,21 +57,24 @@ instantly as the commitment opens; the second is what the workflow picks up.
 
 ## A run that worked
 
-8 September 2026 — against the **previous** deployment, `IrisCommitments`
-`0x7ed55fed7346ef9b5d4a92771486dcbb1c7b6c14` and the simulation receiver
-`0x9d1e5e57dda0f1a0e48e596982858cbc7a8e8e78`. The contracts were redeployed on
-8 September 2026 to carry a note on each commitment, and this run has not yet been
-repeated against the addresses above:
+5 October 2026 — against the addresses above: `IrisCommitments`
+`0x9f7f068b3297c77490b9606063e0f827a2db9a48` and the simulation receiver
+`0x0e7fc813ef8c28b0d41294feb86512afc3c3fd27`.
 
 ```
-[USER LOG] examined 2 commitments, 1 due
-[USER LOG] 1 USD = 1321.225569 NGN
-[USER LOG] released 1 payment(s) — 0x0c6501ea589f1cfc98b6c9ed90349c6d8c5d339ed8b9f0e8df61caba9e8d060c
+[USER LOG] examined 12 commitments, 1 due
+[USER LOG] 1 USD = 1331.279356 NGN
+[USER LOG] released 1 payment(s) — 0x86623e09c5c214090bda110fa08e1c9ffa3ba3990cea69ee05d321dfd83d36ff
 ```
 
-On chain afterwards: commitment #1 at 2 payments of 3, the rate recorded on that
-scheduler as `1 USD = 1321.225569 NGN`, the recipient one AUSD richer — and
-still holding exactly zero native MON, which is the point.
+On chain afterwards: that transaction succeeded in block 68392944, the rate
+reads back off the scheduler as `NGN 1331.279356` with today's timestamp, and
+the recipient is one AUSD richer while still holding exactly zero native MON,
+which is the point.
+
+The rate is not decoration: the app prefers the one recorded here over the
+public source whenever it is for the viewer's own currency, and says which it
+used. See *What it is worth at home* in the root README.
 
 ## What is not done
 
