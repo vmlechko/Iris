@@ -229,9 +229,27 @@ async function cancellation(body: Record<string, unknown>) {
   };
 }
 
+/**
+ * The relayer's key, as the host actually stored it.
+ *
+ * A key pasted into a deployment's settings arrives with whatever came with
+ * it — a trailing newline from a shell, quotes from a file. Trimming them is
+ * free; what is not free is the alternative, which is an empty 500 and no way
+ * to tell a misconfigured deployment from a broken one.
+ */
+function relayerKey(): Hex | undefined {
+  const raw = process.env.SPONSOR_PK?.trim().replace(/^['"]|['"]$/g, "");
+  return raw && /^0x[0-9a-fA-F]{64}$/.test(raw) ? (raw as Hex) : undefined;
+}
+
 export async function POST(request: Request) {
-  const key = process.env.SPONSOR_PK as Hex | undefined;
-  if (!key) return NextResponse.json({ error: "Relayer is not configured." }, { status: 503 });
+  const key = relayerKey();
+  if (!key) {
+    return NextResponse.json(
+      { error: "Relayer is not configured. Its key is missing or is not a 32-byte hex key." },
+      { status: 503 }
+    );
+  }
 
   let body: Record<string, unknown>;
   try {
@@ -244,7 +262,12 @@ export async function POST(request: Request) {
   const account = privateKeyToAccount(key);
   const wallet = createWalletClient({ account, chain: monadTestnet, transport: http(process.env.MONAD_RPC_URL) });
 
-  const gas = await publicClient.getBalance({ address: account.address });
+  // The chain is the one dependency this route cannot do without, and a node
+  // having a bad minute should read as such rather than as a crash.
+  const gas = await publicClient.getBalance({ address: account.address }).catch(() => undefined);
+  if (gas === undefined) {
+    return NextResponse.json({ error: "Monad is not answering right now. Try again shortly." }, { status: 503 });
+  }
   if (gas < FLOOR) {
     return NextResponse.json(
       { error: "The demo has run out of test gas and needs a top-up before it can send anything." },
